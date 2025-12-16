@@ -1,0 +1,383 @@
+---
+title: Tests & Groups
+description: Organizing tests with scopes, groups, and test cases
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Tests & Groups
+
+scaf provides a hierarchical structure for organizing tests: **scopes** group tests by query, **groups** organize related scenarios, and **tests** define individual cases.
+
+## Test Scopes
+
+Every test must be inside a scope that matches a defined query:
+
+```scaf
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email
+`
+
+// Scope name must match query name
+GetUser {
+  test "finds user" {
+    $userId: 1
+    u.name: "Alice"
+  }
+}
+```
+
+<Aside type="caution">
+  The scope name must exactly match a query name. If no matching query exists, scaf will report an error.
+</Aside>
+
+### Multiple Scopes
+
+You can have multiple scopes in one file:
+
+```scaf
+query GetUser `...`
+query CreateUser `...`
+query DeleteUser `...`
+
+GetUser {
+  test "finds user" { ... }
+}
+
+CreateUser {
+  test "creates user" { ... }
+}
+
+DeleteUser {
+  test "deletes user" { ... }
+}
+```
+
+## Groups
+
+Groups organize related tests within a scope:
+
+```scaf
+GetUser {
+  group "existing users" {
+    test "finds Alice" {
+      $userId: 1
+      u.name: "Alice"
+    }
+    
+    test "finds Bob" {
+      $userId: 2
+      u.name: "Bob"
+    }
+  }
+  
+  group "edge cases" {
+    test "missing user" {
+      $userId: 999
+      u.name: null
+    }
+  }
+}
+```
+
+### Nested Groups
+
+Groups can be nested for deeper organization:
+
+```scaf
+GetUser {
+  group "by role" {
+    group "admin users" {
+      test "admin with full access" {
+        $userId: 1
+        u.role: "admin"
+        u.canDelete: true
+      }
+    }
+    
+    group "regular users" {
+      test "user with limited access" {
+        $userId: 2
+        u.role: "user"
+        u.canDelete: false
+      }
+    }
+  }
+}
+```
+
+### Group Setup
+
+Groups can have their own setup that applies to all contained tests:
+
+```scaf
+GetUser {
+  group "with posts" {
+    setup `
+    CREATE (u:User {id: 1, name: "Alice"})
+    CREATE (p1:Post {id: 1, authorId: 1, title: "Post 1"})
+    CREATE (p2:Post {id: 2, authorId: 1, title: "Post 2"})
+    `
+    
+    test "user has posts" {
+      $userId: 1
+      u.name: "Alice"
+    }
+    
+    test "post count is correct" {
+      $userId: 1
+      // ...
+    }
+  }
+}
+```
+
+## Tests
+
+Tests are the core unit. Each test specifies:
+
+### Input Parameters
+
+Prefixed with `$`:
+
+```scaf
+test "finds user by id" {
+  $userId: 1
+  $includeDeleted: false
+  
+  // ...
+}
+```
+
+### Expected Outputs
+
+Field paths and their expected values:
+
+```scaf
+test "returns all user fields" {
+  $userId: 1
+  
+  u.name: "Alice"
+  u.email: "alice@example.com"
+  u.age: 30
+  u.verified: true
+  u.tags: ["admin", "beta-tester"]
+  u.metadata: {theme: "dark", notifications: true}
+}
+```
+
+### Test-Level Setup
+
+Tests can have their own setup:
+
+```scaf
+test "with temp data" {
+  setup `CREATE (:TempNode {id: 999})`
+  
+  $userId: 1
+  u.name: "Alice"
+}
+```
+
+### Assertions
+
+Expression-based or query-based validations:
+
+```scaf
+test "user meets requirements" {
+  $userId: 1
+  
+  u.name: "Alice"
+  
+  assert {
+    u.age >= 18;
+    u.verified == true
+  }
+}
+```
+
+## Test Execution
+
+### Setup Inheritance
+
+Tests inherit setup from all ancestors:
+
+```scaf
+// 1. Suite setup runs first
+setup `CREATE (:Config {key: "value"})`
+
+GetUser {
+  // 2. Scope setup runs second
+  setup `CREATE (:User {id: 1, name: "Alice"})`
+  
+  group "with posts" {
+    // 3. Group setup runs third
+    setup `CREATE (:Post {authorId: 1})`
+    
+    test "user with post" {
+      // 4. Test setup runs last
+      setup `CREATE (:Comment {postId: 1})`
+      
+      $userId: 1
+      u.name: "Alice"
+    }
+  }
+}
+```
+
+The execution order is: Suite → Scope → Group → Test.
+
+### Transaction Isolation
+
+Each test runs in its own transaction that rolls back after completion:
+
+```scaf
+CountUsers {
+  test "base count is 2" {
+    count: 2
+  }
+  
+  test "temp user in transaction" {
+    setup `CREATE (:User {id: 999})`
+    count: 3  // Sees the temp user
+  }
+  
+  test "still 2 after rollback" {
+    count: 2  // Previous test's data was rolled back
+  }
+}
+```
+
+<Aside type="tip">
+  Transaction rollback means tests are isolated — one test's setup doesn't affect other tests.
+</Aside>
+
+### Teardown
+
+Teardown blocks run in reverse order after tests complete:
+
+```scaf
+setup `CREATE (:A)`
+teardown `MATCH (a:A) DELETE a`
+
+GetUser {
+  setup `CREATE (:B)`
+  teardown `MATCH (b:B) DELETE b`
+  
+  test "example" {
+    // After this test:
+    // 1. Scope teardown runs (delete B)
+    // 2. Suite teardown runs (delete A)
+  }
+}
+```
+
+## Test Naming
+
+Test names should be descriptive:
+
+```scaf
+// Good: Describes the scenario and expectation
+test "finds existing user by id" { ... }
+test "returns null for non-existent user" { ... }
+test "validates email format on creation" { ... }
+
+// Avoid: Vague or technical names  
+test "test1" { ... }
+test "user query" { ... }
+test "happy path" { ... }
+```
+
+Group names should describe the category:
+
+```scaf
+// Good: Clear category names
+group "existing users" { ... }
+group "authentication" { ... }
+group "error handling" { ... }
+
+// Avoid: Overly generic
+group "tests" { ... }
+group "cases" { ... }
+```
+
+## Test Path
+
+Each test has a unique path: `QueryScope/Group/Test`:
+
+```scaf
+GetUser {
+  group "existing users" {
+    test "finds Alice" { ... }  // Path: GetUser/existing users/finds Alice
+  }
+  
+  test "missing user" { ... }   // Path: GetUser/missing user
+}
+```
+
+This path is used for:
+- Test filtering with `--run`
+- Verbose output
+- Neotest integration
+
+## Filtering Tests
+
+Run specific tests using the `--run` flag:
+
+```bash
+# Run all tests in GetUser scope
+scaf test --run="GetUser"
+
+# Run tests in a specific group
+scaf test --run="GetUser/existing users"
+
+# Run a specific test
+scaf test --run="GetUser/existing users/finds Alice"
+
+# Pattern matching
+scaf test --run="*/edge cases/*"
+```
+
+## Best Practices
+
+1. **One assertion per concept** — Keep tests focused
+
+2. **Descriptive names** — Names should explain the scenario
+
+3. **Use groups for organization** — Group related scenarios together
+
+4. **Leverage setup inheritance** — DRY up common setup
+
+5. **Test edge cases** — Include null, missing, and invalid inputs
+
+```scaf
+GetUser {
+  group "happy path" {
+    test "finds user with all fields" {
+      $userId: 1
+      u.name: "Alice"
+      u.email: "alice@example.com"
+    }
+  }
+  
+  group "edge cases" {
+    test "missing user returns null" {
+      $userId: 999
+      u.name: null
+    }
+    
+    test "handles negative id" {
+      $userId: -1
+      u.name: null
+    }
+  }
+  
+  group "validation" {
+    test "age must be positive" {
+      $userId: 1
+      assert { u.age > 0 }
+    }
+  }
+}
+```

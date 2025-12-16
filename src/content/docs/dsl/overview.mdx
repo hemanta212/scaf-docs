@@ -1,0 +1,407 @@
+---
+title: DSL Overview
+description: Complete overview of the scaf domain-specific language
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# DSL Overview
+
+scaf uses a declarative domain-specific language designed for readability and expressiveness. This page provides a complete overview of the language structure.
+
+## File Structure
+
+A scaf file consists of these sections, in order:
+
+```scaf
+// 1. Imports (optional)
+import fixtures "./shared/fixtures"
+
+// 2. Query definitions
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name
+`
+
+// 3. Global setup (optional)
+setup `CREATE (:User {id: 1, name: "Alice"})`
+
+// 4. Global teardown (optional)
+teardown `MATCH (n) DETACH DELETE n`
+
+// 5. Query scopes with tests
+GetUser {
+  test "finds user" {
+    $userId: 1
+    u.name: "Alice"
+  }
+}
+```
+
+## Syntax Elements
+
+### Comments
+
+Single-line comments start with `//`:
+
+```scaf
+// This is a comment
+query GetUser `...` // Inline comment
+```
+
+### Identifiers
+
+Identifiers follow standard rules:
+- Start with a letter or underscore
+- Contain letters, digits, or underscores
+- Case-sensitive
+
+```scaf
+query GetUserById `...`  // Valid
+query get_user_2 `...`   // Valid
+query 2users `...`       // Invalid - starts with digit
+```
+
+### Strings
+
+Two string formats:
+
+**Quoted strings** — For test names, imports, and values:
+```scaf
+import "path/to/module"
+test "my test name" { ... }
+u.name: "Alice"
+u.status: 'active'  // Single quotes also work
+```
+
+**Raw strings** — For query bodies (backtick-delimited):
+```scaf
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email
+`
+```
+
+### Numbers
+
+Multiple number formats supported:
+
+```scaf
+age: 42           // Integer
+price: 3.14       // Float
+id: 0xFF          // Hexadecimal
+mask: 0b1010      // Binary
+perms: 0o755      // Octal
+big: 1_000_000    // Underscores for readability
+exp: 1.5e10       // Scientific notation
+negative: -42     // Negative numbers
+```
+
+### Booleans and Null
+
+```scaf
+verified: true
+deleted: false
+nickname: null
+```
+
+### Collections
+
+**Lists:**
+```scaf
+tags: ["tag1", "tag2", "tag3"]
+ids: [1, 2, 3]
+mixed: [1, "two", true, null]
+```
+
+**Maps:**
+```scaf
+metadata: {key: "value", count: 42}
+nested: {outer: {inner: "value"}}
+```
+
+## Queries
+
+Define named database queries:
+
+```scaf
+query QueryName `
+  -- Your database query here
+  -- Parameters use $paramName syntax
+`
+```
+
+Example with Cypher:
+
+```scaf
+query GetUserWithPosts `
+MATCH (u:User {id: $userId})
+OPTIONAL MATCH (u)-[:AUTHORED]->(p:Post)
+RETURN u.name, collect(p.title) as posts
+`
+```
+
+<Aside type="tip">
+  Query parameters use the `$param` syntax, matching most database driver conventions.
+</Aside>
+
+## Test Scopes
+
+Group tests by the query they exercise:
+
+```scaf
+GetUserWithPosts {
+  // Tests and groups go here
+  
+  test "user with posts" {
+    $userId: 1
+    u.name: "Alice"
+    posts: ["Post 1", "Post 2"]
+  }
+}
+```
+
+The scope name must exactly match a defined query name.
+
+## Groups
+
+Organize related tests:
+
+```scaf
+GetUser {
+  group "happy path" {
+    test "finds existing user" { ... }
+    test "returns all fields" { ... }
+  }
+  
+  group "edge cases" {
+    test "handles missing user" { ... }
+    test "handles invalid id" { ... }
+  }
+  
+  // Groups can nest
+  group "permissions" {
+    group "admin users" {
+      test "can see all fields" { ... }
+    }
+    group "regular users" {
+      test "sees limited fields" { ... }
+    }
+  }
+}
+```
+
+## Tests
+
+The core unit. Each test specifies inputs, expected outputs, and optional assertions:
+
+```scaf
+test "descriptive test name" {
+  // Optional: test-specific setup
+  setup `CREATE (:TempNode)`
+  
+  // Input parameters (prefixed with $)
+  $userId: 1
+  $includeDeleted: false
+  
+  // Expected outputs (field paths)
+  u.name: "Alice"
+  u.email: "alice@example.com"
+  u.age: 30
+  u.verified: true
+  u.tags: ["admin", "user"]
+  
+  // Optional: expression assertions
+  assert {
+    u.age >= 18;
+    u.email contains "@"
+  }
+  
+  // Optional: query assertions
+  assert `MATCH (p:Post) RETURN count(p) as cnt` {
+    cnt > 0
+  }
+}
+```
+
+## Setup and Teardown
+
+Run code before and after tests:
+
+### Inline Setup
+
+```scaf
+setup `
+CREATE (:User {id: 1, name: "Alice"})
+CREATE (:User {id: 2, name: "Bob"})
+`
+
+teardown `
+MATCH (n) DETACH DELETE n
+`
+```
+
+### Named Setup
+
+Reference setups defined in other files:
+
+```scaf
+import fixtures "./shared/fixtures"
+
+setup fixtures.CreateUsers()
+
+// With parameters
+setup fixtures.CreatePosts($count: 10, $authorId: 1)
+```
+
+### Setup Levels
+
+Setup can be defined at multiple levels:
+
+```scaf
+// Suite level - runs once for entire file
+setup `...`
+
+QueryName {
+  // Scope level - runs for this query scope
+  setup `...`
+  
+  group "scenario" {
+    // Group level - runs for this group
+    setup `...`
+    
+    test "case" {
+      // Test level - runs for this test only
+      setup `...`
+    }
+  }
+}
+```
+
+## Assertions
+
+Two types of assertions:
+
+### Expression Assertions
+
+Validate output values using expressions:
+
+```scaf
+assert {
+  u.age >= 18;
+  u.email contains "@";
+  len(u.name) > 0;
+  u.status == "active" || u.status == "pending"
+}
+```
+
+### Query Assertions
+
+Run additional queries and validate their results:
+
+```scaf
+// Inline query
+assert `MATCH (p:Post) WHERE p.authorId = 1 RETURN count(p) as cnt` {
+  cnt > 0
+}
+
+// Named query
+assert CountUsers() {
+  count == 2
+}
+
+// Named query with parameters
+assert GetPostsByAuthor($authorId: 1) {
+  len(posts) > 0;
+  posts[0].title != ""
+}
+```
+
+## Imports
+
+Reuse setup and fixtures across files:
+
+```scaf
+// Simple import
+import "./shared/fixtures"
+
+// Import with alias
+import fixtures "./shared/fixtures"
+
+// Use imported setups
+setup fixtures.CreateTestData()
+```
+
+See [Imports](/dsl/imports/) for full details.
+
+## Complete Example
+
+```scaf
+// Imports
+import fixtures "./shared/fixtures"
+
+// Queries
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email, u.age, u.verified
+`
+
+query CountUsers `
+MATCH (u:User)
+RETURN count(u) as cnt
+`
+
+// Global setup
+setup fixtures.CreateUsers()
+
+// Global teardown
+teardown `MATCH (n) DETACH DELETE n`
+
+// Tests
+GetUser {
+  setup `CREATE (:Session {userId: 1})`
+  
+  group "existing users" {
+    test "finds Alice with all fields" {
+      $userId: 1
+      
+      u.name: "Alice"
+      u.email: "alice@example.com"
+      u.age: 30
+      u.verified: true
+      
+      assert { u.age >= 18 }
+    }
+    
+    test "finds Bob" {
+      $userId: 2
+      
+      u.name: "Bob"
+      u.age: 25
+    }
+  }
+  
+  group "edge cases" {
+    test "missing user returns null" {
+      $userId: 999
+      
+      u.name: null
+      u.email: null
+    }
+  }
+}
+
+CountUsers {
+  test "base count" {
+    cnt: 2
+  }
+  
+  test "with temp user" {
+    setup `CREATE (:User {id: 999})`
+    
+    cnt: 3
+    
+    assert CountUsers() { cnt > 2 }
+  }
+}
+```

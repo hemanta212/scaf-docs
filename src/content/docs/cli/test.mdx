@@ -1,0 +1,225 @@
+---
+title: scaf test
+description: Running tests with the scaf CLI
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# scaf test
+
+The `test` command runs scaf test files against your database.
+
+## Basic Usage
+
+```bash
+# Run all .scaf files in current directory
+scaf test
+
+# Run specific file
+scaf test queries/users.scaf
+
+# Run multiple files
+scaf test queries/users.scaf queries/posts.scaf
+
+# Run all files matching pattern
+scaf test ./queries/*.scaf
+```
+
+## Options
+
+### `--format`, `-f`
+
+Output format for test results:
+
+| Format | Description |
+|--------|-------------|
+| `dots` | Minimal: `.` for pass, `F` for fail, `S` for skip (default) |
+| `verbose` | Full test names and timing |
+| `json` | Streaming JSON events for tooling |
+
+```bash
+scaf test --format=verbose
+scaf test -f json
+```
+
+### `--run`, `-r`
+
+Filter tests by path pattern:
+
+```bash
+# Run all tests in GetUser scope
+scaf test --run="GetUser"
+
+# Run specific group
+scaf test --run="GetUser/existing users"
+
+# Run specific test
+scaf test --run="GetUser/existing users/finds Alice"
+
+# Wildcard patterns
+scaf test --run="*/edge cases/*"
+```
+
+### `--fail-fast`
+
+Stop on first test failure:
+
+```bash
+scaf test --fail-fast
+```
+
+### `--database`, `-d`
+
+Override the configured database:
+
+```bash
+scaf test --database=neo4j
+scaf test -d postgres
+```
+
+### `--parallel`, `-p`
+
+Number of tests to run concurrently (default: 1):
+
+```bash
+scaf test --parallel=4
+```
+
+<Aside type="caution">
+  Database tests are sequential by default because of shared state. Only enable parallelism if your tests are isolated.
+</Aside>
+
+### `--timeout`
+
+Maximum time for each test:
+
+```bash
+scaf test --timeout=30s
+scaf test --timeout=5m
+```
+
+### `--config`, `-c`
+
+Path to config file:
+
+```bash
+scaf test --config=./custom.scaf.yaml
+```
+
+## Output Formats
+
+### Dots (Default)
+
+Minimal output:
+
+```
+$ scaf test
+
+.....
+5 passed, 0 failed, 0 skipped (0.05s)
+```
+
+- `.` — Pass
+- `F` — Fail
+- `S` — Skip
+- `E` — Error
+
+### Verbose
+
+Full test paths and timing:
+
+```
+$ scaf test --format=verbose
+
+users.scaf
+  GetUser/existing users/finds Alice by id ... passed (0.01s)
+  GetUser/existing users/finds Bob by id ... passed (0.01s)
+  GetUser/edge cases/missing user ... passed (0.01s)
+  CountUsers/counts all users ... passed (0.01s)
+
+4 passed, 0 failed, 0 skipped (0.04s)
+```
+
+### JSON
+
+Streaming newline-delimited JSON:
+
+```bash
+$ scaf test --format=json
+
+{"time":"2024-01-15T10:30:00Z","action":"run","id":"users.scaf::GetUser::finds Alice"}
+{"time":"2024-01-15T10:30:00Z","action":"passed","id":"users.scaf::GetUser::finds Alice","elapsed":0.012}
+{"action":"summary","total":4,"passed":4,"failed":0,"skipped":0,"elapsed":0.05,"ok":true}
+```
+
+JSON events:
+
+| Action | Description |
+|--------|-------------|
+| `run` | Test starting |
+| `passed` | Test passed |
+| `failed` | Test failed |
+| `skipped` | Test skipped |
+| `error` | Infrastructure error |
+| `output` | Log output |
+| `summary` | Final summary |
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | All tests passed |
+| 1 | One or more tests failed |
+| 2 | Configuration or connection error |
+
+## Failure Output
+
+When tests fail, scaf shows details:
+
+```
+$ scaf test --format=verbose
+
+GetUser/finds Alice by id ... FAILED (0.01s)
+  field: u.name
+  expected: "Wrong Name"
+  actual: "Alice"
+
+GetUser/age check ... FAILED (0.01s)
+  assertion failed: u.age >= 21
+  u.age = 18
+
+0 passed, 2 failed, 0 skipped (0.02s)
+```
+
+## Examples
+
+### CI/CD Pipeline
+
+```bash
+# Run all tests with JSON output for parsing
+scaf test --format=json > test-results.json
+
+# Fail fast in CI
+scaf test --fail-fast --format=verbose
+```
+
+### Development Workflow
+
+```bash
+# Run tests for the file you're working on
+scaf test queries/users.scaf --format=verbose
+
+# Run specific test while debugging
+scaf test --run="GetUser/edge cases/missing user" --format=verbose
+```
+
+### Watch Mode
+
+<Aside type="note">
+  Watch mode is planned for a future release.
+</Aside>
+
+```bash
+# Currently, use external tools
+watchexec -e scaf -- scaf test
+```

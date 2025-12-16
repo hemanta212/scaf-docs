@@ -1,0 +1,290 @@
+---
+title: Queries
+description: Defining database queries in scaf
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# Queries
+
+Queries are the foundation of scaf tests. Each query definition declares a named database query that tests will exercise.
+
+## Basic Syntax
+
+```scaf
+query QueryName `
+  -- Your database query here
+`
+```
+
+The query body is enclosed in backticks (`` ` ``) and contains raw database syntax in your configured dialect.
+
+## Naming Queries
+
+Query names must be valid identifiers:
+- Start with a letter or underscore
+- Contain letters, digits, or underscores
+- Are case-sensitive
+
+```scaf
+query GetUser `...`        // Valid
+query getUserById `...`    // Valid
+query get_user_2 `...`     // Valid
+query _internal `...`      // Valid (starts with underscore)
+```
+
+<Aside type="tip">
+  Use PascalCase or camelCase for query names. This matches the convention in most programming languages and makes the scope declarations readable.
+</Aside>
+
+## Parameters
+
+Queries use `$paramName` syntax for parameters:
+
+```scaf
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email
+`
+
+query SearchUsers `
+MATCH (u:User)
+WHERE u.name CONTAINS $searchTerm
+  AND u.age >= $minAge
+RETURN u
+`
+```
+
+Parameters are provided in test cases:
+
+```scaf
+GetUser {
+  test "finds user" {
+    $userId: 1
+    $searchTerm: "ali"
+    $minAge: 18
+    
+    u.name: "Alice"
+  }
+}
+```
+
+## Return Values
+
+Queries should return named values that tests can reference:
+
+```scaf
+query GetUserStats `
+MATCH (u:User {id: $userId})
+OPTIONAL MATCH (u)-[:AUTHORED]->(p:Post)
+RETURN 
+  u.name as name,
+  u.email as email,
+  count(p) as postCount,
+  collect(p.title) as postTitles
+`
+```
+
+In tests, reference these by their alias:
+
+```scaf
+GetUserStats {
+  test "user with posts" {
+    $userId: 1
+    
+    name: "Alice"
+    postCount: 5
+    postTitles: ["Post 1", "Post 2", "Post 3", "Post 4", "Post 5"]
+  }
+}
+```
+
+### Property Paths
+
+For node/relationship returns, use dot notation:
+
+```scaf
+query GetUserNode `
+MATCH (u:User {id: $userId})
+RETURN u
+`
+
+GetUserNode {
+  test "returns user node" {
+    $userId: 1
+    
+    u.name: "Alice"
+    u.email: "alice@example.com"
+    u.age: 30
+  }
+}
+```
+
+## Multi-Statement Queries
+
+Queries can contain multiple statements:
+
+```scaf
+query CreateAndReturn `
+CREATE (u:User {id: $id, name: $name})
+WITH u
+MATCH (u)-[:FRIENDS_WITH]->(f:User)
+RETURN u.name, collect(f.name) as friends
+`
+```
+
+## Cypher Examples
+
+### Simple MATCH
+
+```scaf
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email
+`
+```
+
+### With Relationships
+
+```scaf
+query GetUserWithFriends `
+MATCH (u:User {id: $userId})-[:FRIENDS_WITH]->(f:User)
+RETURN u.name, collect(f.name) as friends
+`
+```
+
+### Aggregations
+
+```scaf
+query GetUserStats `
+MATCH (u:User {id: $userId})
+OPTIONAL MATCH (u)-[:AUTHORED]->(p:Post)
+OPTIONAL MATCH (p)<-[:LIKES]-(liker:User)
+RETURN 
+  u.name,
+  count(DISTINCT p) as postCount,
+  count(liker) as totalLikes
+`
+```
+
+### Optional Matching
+
+```scaf
+query GetUserOptional `
+MATCH (u:User {id: $userId})
+OPTIONAL MATCH (u)-[:HAS_PROFILE]->(p:Profile)
+RETURN u.name, p.bio
+`
+```
+
+### CREATE Operations
+
+```scaf
+query CreateUser `
+CREATE (u:User {id: $id, name: $name, email: $email})
+RETURN u.id, u.name
+`
+
+CreateUser {
+  test "creates user" {
+    $id: 999
+    $name: "New User"
+    $email: "new@example.com"
+    
+    u.id: 999
+    u.name: "New User"
+  }
+}
+```
+
+### UPDATE Operations
+
+```scaf
+query UpdateUserEmail `
+MATCH (u:User {id: $userId})
+SET u.email = $newEmail
+RETURN u.email
+`
+```
+
+### DELETE Operations
+
+```scaf
+query DeleteUser `
+MATCH (u:User {id: $userId})
+DELETE u
+RETURN count(*) as deleted
+`
+
+DeleteUser {
+  test "deletes user" {
+    $userId: 1
+    
+    deleted: 1
+  }
+}
+```
+
+## SQL Examples
+
+<Aside type="note">
+  SQL dialect support is coming soon.
+</Aside>
+
+### Simple SELECT
+
+```scaf
+query GetUser `
+SELECT name, email, age
+FROM users
+WHERE id = $userId
+`
+```
+
+### With JOINs
+
+```scaf
+query GetUserWithPosts `
+SELECT 
+  u.name,
+  u.email,
+  COUNT(p.id) as post_count
+FROM users u
+LEFT JOIN posts p ON p.author_id = u.id
+WHERE u.id = $userId
+GROUP BY u.id, u.name, u.email
+`
+```
+
+## Query Best Practices
+
+1. **Use descriptive names** — `GetUserById` is clearer than `Q1`
+
+2. **Return named values** — Makes test assertions more readable
+
+3. **Keep queries focused** — One query per operation type
+
+4. **Use parameters** — Never hardcode values that should vary
+
+5. **Format for readability** — Multi-line queries are fine
+
+```scaf
+// Good: Clear, parameterized, returns named values
+query GetActiveUsersInCity `
+MATCH (u:User)
+WHERE u.active = true
+  AND u.city = $city
+RETURN 
+  u.name as name,
+  u.email as email,
+  u.joinDate as joinedAt
+ORDER BY u.joinDate DESC
+LIMIT $limit
+`
+
+// Avoid: Unclear name, no parameters
+query Q3 `
+MATCH (u:User {active: true, city: "NYC"})
+RETURN u
+`
+```

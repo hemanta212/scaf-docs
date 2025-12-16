@@ -1,0 +1,253 @@
+---
+title: Imports
+description: Reusing setup and fixtures across scaf files
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# Imports
+
+Imports allow you to reuse setup queries, fixtures, and test utilities across multiple scaf files.
+
+## Basic Syntax
+
+```scaf
+// Import a module
+import "./shared/fixtures"
+
+// Import with alias
+import fixtures "./shared/fixtures"
+```
+
+## Import Paths
+
+Paths are relative to the current file:
+
+```
+project/
+├── queries/
+│   ├── users.scaf         # import "../shared/fixtures"
+│   └── posts.scaf         # import "../shared/fixtures"
+├── shared/
+│   └── fixtures.scaf      # defines reusable setups
+└── .scaf.yaml
+```
+
+## Using Imported Setups
+
+After importing, use the module's queries in setup blocks:
+
+```scaf
+import fixtures "./shared/fixtures"
+
+// Use as named setup
+setup fixtures.CreateUsers()
+
+// With parameters
+setup fixtures.CreatePosts($count: 10, $authorId: 1)
+```
+
+## Defining Reusable Setups
+
+In your shared file, define queries that can be called as setups:
+
+```scaf title="shared/fixtures.scaf"
+// Simple setup - no parameters
+query CreateUsers `
+CREATE (alice:User {id: 1, name: "Alice", email: "alice@example.com", age: 30})
+CREATE (bob:User {id: 2, name: "Bob", email: "bob@example.com", age: 25})
+`
+
+// Parameterized setup
+query CreatePosts `
+UNWIND range(1, $count) as i
+CREATE (:Post {
+  id: i,
+  authorId: $authorId,
+  title: "Post " + toString(i),
+  createdAt: timestamp()
+})
+`
+
+// Setup with relationships
+query CreateFriendships `
+MATCH (u1:User {id: $userId})
+UNWIND $friendIds as friendId
+MATCH (u2:User {id: friendId})
+CREATE (u1)-[:FRIENDS_WITH]->(u2)
+`
+```
+
+## Using Fixtures
+
+```scaf title="queries/users.scaf"
+import fixtures "./shared/fixtures"
+
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email, u.age
+`
+
+// Suite setup using fixture
+setup fixtures.CreateUsers()
+
+GetUser {
+  // Scope setup with parameters
+  setup fixtures.CreatePosts($count: 5, $authorId: 1)
+  
+  group "with friends" {
+    // Group setup with parameters
+    setup fixtures.CreateFriendships($userId: 1, $friendIds: [2])
+    
+    test "user has friends and posts" {
+      $userId: 1
+      u.name: "Alice"
+    }
+  }
+}
+```
+
+## Aliases
+
+Use aliases to distinguish between multiple imports:
+
+```scaf
+import users "./shared/user-fixtures"
+import posts "./shared/post-fixtures"
+import common "./shared/common"
+
+setup common.ClearDatabase()
+setup users.CreateTestUsers()
+setup posts.CreateTestPosts($count: 10)
+```
+
+## Import Resolution
+
+scaf resolves imports at parse time:
+
+1. Path is resolved relative to the importing file
+2. The imported file is parsed
+3. Query definitions become available via the alias
+
+<Aside type="caution">
+  Circular imports are not allowed. If `a.scaf` imports `b.scaf`, then `b.scaf` cannot import `a.scaf`.
+</Aside>
+
+## Module Organization
+
+### By Data Type
+
+```
+shared/
+├── users.scaf       # User fixtures
+├── posts.scaf       # Post fixtures
+├── comments.scaf    # Comment fixtures
+└── common.scaf      # Clear database, etc.
+```
+
+### By Purpose
+
+```
+shared/
+├── fixtures.scaf    # Test data creation
+├── cleanup.scaf     # Teardown utilities
+└── assertions.scaf  # Common assertion queries
+```
+
+### Hierarchical
+
+```
+shared/
+├── fixtures/
+│   ├── users.scaf
+│   ├── posts.scaf
+│   └── index.scaf   # Re-exports all
+└── utils/
+    └── cleanup.scaf
+```
+
+## Passing Parameters
+
+### Simple Values
+
+```scaf
+setup fixtures.CreateUser($id: 1, $name: "Alice")
+```
+
+### Collections
+
+```scaf
+setup fixtures.CreateFriendships(
+  $userId: 1,
+  $friendIds: [2, 3, 4, 5]
+)
+```
+
+### Maps
+
+```scaf
+setup fixtures.CreateUser(
+  $id: 1,
+  $data: {name: "Alice", email: "alice@example.com", age: 30}
+)
+```
+
+### From Query Results
+
+```scaf
+test "with dynamic data" {
+  $userId: 1
+  
+  u.id: 1
+  
+  // Use result value as parameter
+  assert fixtures.CountPosts($authorId: u.id) {
+    count >= 0
+  }
+}
+```
+
+## Best Practices
+
+1. **Group related fixtures** — Keep user fixtures together, post fixtures together, etc.
+
+2. **Use descriptive names** — `CreateUserWithPosts` is clearer than `Setup1`
+
+3. **Parameterize when possible** — Make fixtures flexible
+
+4. **Document complex fixtures** — Add comments explaining the data structure
+
+5. **Keep fixtures focused** — One responsibility per setup query
+
+```scaf title="shared/fixtures.scaf"
+// Creates a standard test user with optional profile
+// Parameters:
+//   $id: User ID (required)
+//   $name: Display name (required)
+//   $withProfile: Create profile if true (optional, default false)
+query CreateUserWithProfile `
+CREATE (u:User {id: $id, name: $name})
+WITH u
+FOREACH (x IN CASE WHEN $withProfile THEN [1] ELSE [] END |
+  CREATE (u)-[:HAS_PROFILE]->(:Profile {bio: "Hello, I am " + $name})
+)
+RETURN u
+`
+```
+
+## Import Errors
+
+scaf reports errors for:
+
+- File not found
+- Circular imports
+- Invalid path syntax
+- Missing query definitions
+
+```
+Error: import "./shared/fixtures"
+  → file not found: ./shared/fixtures.scaf
+
+Error: circular import detected
+  → a.scaf imports b.scaf imports a.scaf
+```

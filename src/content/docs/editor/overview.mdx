@@ -1,0 +1,130 @@
+---
+title: Editor Integration
+description: Setting up your editor for scaf development
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+# Editor Integration
+
+scaf provides excellent editor support through tree-sitter grammar, LSP, and editor plugins.
+
+## Components
+
+<CardGrid>
+  <Card title="tree-sitter-scaf" icon="seti:code-search">
+    Tree-sitter grammar for syntax highlighting and code navigation.
+    
+    [Learn more →](/editor/tree-sitter/)
+  </Card>
+  <Card title="scaf-lsp" icon="seti:shell">
+    Language server providing diagnostics, hover info, and more.
+    
+    [Learn more →](/editor/lsp/)
+  </Card>
+  <Card title="scaf.nvim" icon="seti:vim">
+    Neovim plugin with tree-sitter, LSP, and neotest integration.
+    
+    [Learn more →](/editor/neovim/)
+  </Card>
+</CardGrid>
+
+## Quick Setup
+
+### Neovim
+
+The fastest way to get started with Neovim:
+
+```lua
+-- lazy.nvim
+{
+  "rlch/scaf.nvim",
+  dependencies = { "nvim-treesitter/nvim-treesitter" },
+  config = function()
+    require("scaf").setup({})
+  end,
+}
+```
+
+Then run `:TSInstall scaf`.
+
+See [Neovim setup](/editor/neovim/) for full details.
+
+### VS Code
+
+<Aside type="note">
+  VS Code extension is planned. Contributions welcome!
+</Aside>
+
+### Other Editors
+
+Any editor supporting tree-sitter or LSP can use:
+
+- **tree-sitter-scaf** for highlighting
+- **scaf-lsp** for diagnostics
+
+## Features
+
+### Syntax Highlighting
+
+Full scaf DSL highlighting:
+- Keywords (`query`, `test`, `group`, `setup`, etc.)
+- Strings and raw strings
+- Numbers and booleans
+- Comments
+- Parameters (`$param`)
+
+### Language Injection
+
+Query bodies are highlighted using their dialect:
+- Cypher queries get Cypher highlighting
+- SQL queries get SQL highlighting
+
+The dialect is determined from the database in `.scaf.yaml`:
+- `neo4j:` → Cypher highlighting
+- `postgres:` / `mysql:` / `sqlite:` → SQL highlighting
+
+### LSP Features
+
+The language server provides:
+- **Diagnostics** — Parse errors, undefined references
+- **Hover** — Information about queries, tests
+- **Go to Definition** — Navigate to query definitions
+- **Document Symbols** — Outline view of tests
+
+### Neotest Integration
+
+Run tests directly from Neovim:
+- Test discovery in the sidebar
+- Run individual tests or groups
+- See pass/fail status inline
+- View test output
+
+## Editor Requirements
+
+| Editor | Requirements |
+|--------|--------------|
+| Neovim | >= 0.9.0, nvim-treesitter |
+| VS Code | (Planned) |
+| Emacs | tree-sitter support |
+| Helix | tree-sitter built-in |
+| Zed | tree-sitter built-in |
+
+## Troubleshooting
+
+### Highlighting Not Working
+
+1. Ensure tree-sitter-scaf is installed
+2. Check filetype: `:set ft?` should show `scaf`
+3. Run `:TSInstall scaf`
+
+### LSP Not Starting
+
+1. Verify `scaf-lsp` is in PATH: `which scaf-lsp`
+2. Check LSP logs: `:LspLog` in Neovim
+3. Try manual start: `require("scaf").start_lsp()`
+
+### Wrong Dialect Highlighting
+
+1. Check `.scaf.yaml` database setting (e.g., `neo4j:` for Cypher)
+2. Clear cache: `:lua require("scaf").clear_cache()`

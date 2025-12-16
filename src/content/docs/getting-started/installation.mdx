@@ -1,0 +1,198 @@
+---
+title: Installation
+description: Install and configure scaf for database testing
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+# Installation
+
+scaf consists of several components:
+
+- **scaf CLI** — The main command-line tool for running tests
+- **scaf-lsp** — Language server for editor diagnostics
+- **tree-sitter-scaf** — Grammar for syntax highlighting
+- **scaf.nvim** — Neovim plugin (optional)
+
+## Installing the CLI
+
+<Tabs>
+<TabItem label="Go Install">
+
+```bash
+go install github.com/rlch/scaf/cmd/scaf@latest
+```
+
+Requires Go 1.21 or later.
+
+</TabItem>
+<TabItem label="From Source">
+
+```bash
+git clone https://github.com/rlch/scaf.git
+cd scaf
+go install ./cmd/scaf
+```
+
+</TabItem>
+</Tabs>
+
+Verify the installation:
+
+```bash
+scaf --version
+```
+
+## Installing the LSP
+
+The language server provides diagnostics and hover information in supported editors.
+
+```bash
+go install github.com/rlch/scaf/cmd/scaf-lsp@latest
+```
+
+## Configuration
+
+<Steps>
+
+1. **Create a configuration file**
+
+   In your project root, create `.scaf.yaml`:
+
+   ```yaml
+   neo4j:
+     uri: bolt://localhost:7687
+     username: neo4j
+     password: password
+   ```
+
+2. **Choose your database**
+
+   Currently supported:
+   - `neo4j` — Neo4j with Cypher queries
+   
+   Coming soon:
+   - `postgres` / `mysql` / `sqlite` — SQL databases
+
+3. **Set up your database connection**
+
+   Ensure your database is running and accessible. For Neo4j:
+
+   ```bash
+   docker run -d \
+     --name neo4j \
+     -p 7474:7474 -p 7687:7687 \
+     -e NEO4J_AUTH=neo4j/password \
+     neo4j:5
+   ```
+
+</Steps>
+
+## Multiple Files
+
+Organize your test files however you like — scaf discovers all `.scaf` files:
+
+```bash
+# Run all tests in a directory
+scaf test queries/
+
+# Run specific files
+scaf test queries/users.scaf queries/posts.scaf
+```
+
+## Project Structure
+
+A typical project structure:
+
+```
+myproject/
+├── .scaf.yaml          # Configuration
+├── queries/
+│   ├── users.scaf      # User-related tests
+│   ├── posts.scaf      # Post-related tests
+│   └── shared/
+│       └── fixtures.scaf  # Shared setup
+└── integration/
+    └── flows.scaf      # Integration tests
+```
+
+## Editor Setup
+
+For the best experience, set up syntax highlighting and LSP support:
+
+<Tabs>
+<TabItem label="Neovim">
+
+1. Install the tree-sitter grammar:
+
+```lua
+local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
+parser_config.scaf = {
+  install_info = {
+    url = "https://github.com/rlch/tree-sitter-scaf",
+    files = { "src/parser.c" },
+    branch = "main",
+  },
+  filetype = "scaf",
+}
+```
+
+2. Install the Neovim plugin:
+
+```lua
+{
+  "rlch/scaf.nvim",
+  dependencies = { "nvim-treesitter/nvim-treesitter" },
+  config = function()
+    require("scaf").setup({})
+  end,
+}
+```
+
+3. Run `:TSInstall scaf`
+
+See [Editor Integration](/editor/neovim/) for full details.
+
+</TabItem>
+<TabItem label="VS Code">
+
+<Aside type="note">
+  VS Code support is planned. Contributions welcome!
+</Aside>
+
+</TabItem>
+</Tabs>
+
+## Verifying Your Setup
+
+Create a simple test file to verify everything works:
+
+```scaf title="test.scaf"
+query Ping `RETURN 1 as value`
+
+Ping {
+  test "database responds" {
+    value: 1
+  }
+}
+```
+
+Run the test:
+
+```bash
+scaf test test.scaf
+```
+
+You should see output like:
+
+```
+.
+1 passed, 0 failed, 0 skipped (0.02s)
+```
+
+## Next Steps
+
+Now that scaf is installed, learn how to write your first real test:
+
+- [Quick Start](/getting-started/quick-start/) — Write comprehensive tests
+- [DSL Overview](/dsl/overview/) — Understand the full syntax

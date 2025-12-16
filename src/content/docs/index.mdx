@@ -1,0 +1,146 @@
+---
+title: scaf
+description: A declarative DSL for database test scaffolding
+template: splash
+hero:
+  tagline: Write database tests the way you think about them — declarative, readable, and powerful.
+  image:
+    file: ../../assets/logo.svg
+  actions:
+    - text: Get Started
+      link: /getting-started/introduction/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/rlch/scaf
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Early Development">
+  scaf is in active development. The DSL syntax is stabilizing but may have minor changes before v1.0.
+</Aside>
+
+## Why scaf?
+
+<CardGrid stagger>
+	<Card title="Declarative Tests" icon="approve-check">
+		Define inputs, expected outputs, and assertions in a clear, readable format. No boilerplate.
+	</Card>
+	<Card title="Database Native" icon="seti:db">
+		Built for database testing. Write queries in your dialect (Cypher, SQL) with full syntax highlighting.
+	</Card>
+	<Card title="Hierarchical Organization" icon="list-format">
+		Group tests by query, feature, or scenario. Inherit setup blocks. Keep things DRY.
+	</Card>
+	<Card title="Editor Support" icon="laptop">
+		Tree-sitter grammar, Neovim plugin with neotest integration, and LSP for diagnostics.
+	</Card>
+</CardGrid>
+
+## Quick Example
+
+```scaf
+// Define your query
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email, u.age
+`
+
+// Global setup
+setup `
+CREATE (alice:User {id: 1, name: "Alice", email: "alice@example.com", age: 30})
+CREATE (bob:User {id: 2, name: "Bob", email: "bob@example.com", age: 25})
+`
+
+// Test the query
+GetUser {
+  group "existing users" {
+    test "finds Alice by id" {
+      $userId: 1
+
+      u.name: "Alice"
+      u.email: "alice@example.com"
+      u.age: 30
+    }
+
+    test "finds Bob by id" {
+      $userId: 2
+
+      u.name: "Bob"
+      u.age: 25
+
+      // Assertion expressions
+      assert { u.age >= 18 }
+    }
+  }
+
+  test "non-existent user returns null" {
+    $userId: 999
+
+    u.name: null
+  }
+}
+```
+
+**The pattern:** Define queries, set up test data, specify inputs with `$param`, and declare expected outputs. Add assertion expressions for complex validations.
+
+## Features
+
+<CardGrid>
+	<Card title="Simple I/O Testing" icon="pencil">
+		Specify `$inputs` and expected outputs. scaf runs the query and compares results.
+		
+		[Learn more →](/dsl/tests/)
+	</Card>
+	<Card title="Expression Assertions" icon="approve-check">
+		Use expr-lang for powerful assertions: comparisons, string matching, function calls.
+		
+		[Learn more →](/dsl/assertions/)
+	</Card>
+	<Card title="Setup Inheritance" icon="list-format">
+		Define setup at suite, scope, group, or test level. Child tests inherit from parents.
+		
+		[Learn more →](/dsl/setup/)
+	</Card>
+	<Card title="Multiple Databases" icon="seti:db">
+		Support for Neo4j (Cypher) with PostgreSQL, MySQL, SQLite coming soon.
+		
+		[Learn more →](/config/databases/)
+	</Card>
+</CardGrid>
+
+## Installation
+
+```bash
+go install github.com/rlch/scaf/cmd/scaf@latest
+```
+
+Then create a `.scaf.yaml` config:
+
+```yaml
+neo4j:
+  uri: bolt://localhost:7687
+  username: neo4j
+  password: password
+```
+
+## Run Your Tests
+
+```bash
+# Run all tests
+scaf test
+
+# Run specific file
+scaf test queries/users.scaf
+
+# With verbose output
+scaf test --format=verbose
+```
+
+## Next Steps
+
+- **[Introduction](/getting-started/introduction/)** - Learn the core concepts
+- **[Quick Start](/getting-started/quick-start/)** - Write your first test file
+- **[DSL Overview](/dsl/overview/)** - Understand the full syntax

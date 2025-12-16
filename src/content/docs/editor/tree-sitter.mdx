@@ -1,0 +1,253 @@
+---
+title: Tree-sitter Grammar
+description: Using the tree-sitter-scaf grammar for syntax highlighting
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# Tree-sitter Grammar
+
+[tree-sitter-scaf](https://github.com/rlch/tree-sitter-scaf) provides syntax highlighting and code navigation for scaf files.
+
+## Installation
+
+### Neovim
+
+Add the parser configuration:
+
+```lua
+local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
+parser_config.scaf = {
+  install_info = {
+    url = "https://github.com/rlch/tree-sitter-scaf",
+    files = { "src/parser.c" },
+    branch = "main",
+  },
+  filetype = "scaf",
+}
+```
+
+Then run `:TSInstall scaf`.
+
+### Helix
+
+Add to `languages.toml`:
+
+```toml
+[[language]]
+name = "scaf"
+scope = "source.scaf"
+file-types = ["scaf"]
+roots = [".scaf.yaml"]
+
+[[grammar]]
+name = "scaf"
+source = { git = "https://github.com/rlch/tree-sitter-scaf", rev = "main" }
+```
+
+Then run `hx --grammar fetch` and `hx --grammar build`.
+
+### Zed
+
+Tree-sitter support is built into Zed. Create an extension or wait for the grammar to be added to the official registry.
+
+### Emacs
+
+With tree-sitter support:
+
+```elisp
+(add-to-list 'treesit-language-source-alist
+             '(scaf "https://github.com/rlch/tree-sitter-scaf"))
+
+(treesit-install-language-grammar 'scaf)
+```
+
+## Syntax Nodes
+
+The grammar defines these node types:
+
+### Top-Level
+
+| Node | Description |
+|------|-------------|
+| `source_file` | Root node |
+| `import_statement` | Import declaration |
+| `query_definition` | Named query |
+| `setup_block` | Setup block |
+| `teardown_block` | Teardown block |
+| `query_scope` | Query scope with tests |
+
+### Test Structure
+
+| Node | Description |
+|------|-------------|
+| `group` | Test group |
+| `test` | Test case |
+| `statement` | Input/output statement |
+| `assertion` | Assert block |
+
+### Expressions
+
+| Node | Description |
+|------|-------------|
+| `expression` | Any expression |
+| `binary_expression` | Binary operation |
+| `unary_expression` | Unary operation |
+| `call_expression` | Function call |
+| `member_expression` | Property access |
+
+### Values
+
+| Node | Description |
+|------|-------------|
+| `string` | Quoted string |
+| `raw_string` | Backtick string |
+| `number` | Numeric literal |
+| `boolean` | `true` / `false` |
+| `null` | `null` |
+| `list` | Array literal |
+| `map` | Object literal |
+
+## Highlight Groups
+
+Standard highlight groups used:
+
+| Group | Usage |
+|-------|-------|
+| `@keyword` | `query`, `test`, `group`, `setup`, etc. |
+| `@function` | Query names, function calls |
+| `@string` | String literals |
+| `@string.special` | Raw strings (query bodies) |
+| `@number` | Numbers |
+| `@constant.builtin` | `true`, `false`, `null` |
+| `@operator` | Operators |
+| `@punctuation.bracket` | `{}`, `[]`, `()` |
+| `@punctuation.delimiter` | `,`, `:`, `;` |
+| `@comment` | Comments |
+| `@variable.parameter` | `$param` variables |
+| `@property` | Property paths |
+
+## Query Files
+
+The grammar includes query files for:
+
+### Highlights (`queries/highlights.scm`)
+
+```scheme
+; Keywords
+(["query" "test" "group" "setup" "teardown" "assert" "import"] @keyword)
+
+; Function names
+(query_definition name: (identifier) @function)
+(named_setup name: (identifier) @function)
+
+; Strings
+(string) @string
+(raw_string) @string.special
+
+; Numbers
+(number) @number
+
+; Booleans and null
+(boolean) @constant.builtin
+(null) @constant.builtin
+
+; Parameters
+((identifier) @variable.parameter
+  (#match? @variable.parameter "^\\$"))
+
+; Comments
+(comment) @comment
+```
+
+### Injections (`queries/injections.scm`)
+
+Injection queries for language highlighting in query bodies:
+
+```scheme
+; Inject dialect language into raw strings
+((raw_string) @injection.content
+  (#set! injection.language "cypher"))
+```
+
+<Aside type="note">
+  scaf.nvim dynamically determines the injection language based on config.
+</Aside>
+
+### Locals (`queries/locals.scm`)
+
+For scope tracking and go-to-definition:
+
+```scheme
+; Query definitions create scope
+(query_definition
+  name: (identifier) @definition.function)
+
+; Query scope references a query
+(query_scope
+  query_name: (identifier) @reference)
+```
+
+## Building from Source
+
+```bash
+git clone https://github.com/rlch/tree-sitter-scaf
+cd tree-sitter-scaf
+npm install
+npm run build
+```
+
+### Testing
+
+```bash
+npm test
+```
+
+### Generating Parser
+
+After modifying `grammar.js`:
+
+```bash
+npx tree-sitter generate
+```
+
+## Integration Example
+
+Parse a scaf file programmatically:
+
+```javascript
+const Parser = require('tree-sitter');
+const Scaf = require('tree-sitter-scaf');
+
+const parser = new Parser();
+parser.setLanguage(Scaf);
+
+const sourceCode = `
+query GetUser \`
+MATCH (u:User {id: $userId})
+RETURN u.name
+\`
+
+GetUser {
+  test "finds user" {
+    $userId: 1
+    u.name: "Alice"
+  }
+}
+`;
+
+const tree = parser.parse(sourceCode);
+console.log(tree.rootNode.toString());
+```
+
+Output:
+```
+(source_file
+  (query_definition name: (identifier) body: (raw_string))
+  (query_scope
+    query_name: (identifier)
+    (test
+      name: (string)
+      (statement key: (property_path (identifier)) value: (number))
+      (statement key: (property_path (identifier) (identifier)) value: (string)))))
+```

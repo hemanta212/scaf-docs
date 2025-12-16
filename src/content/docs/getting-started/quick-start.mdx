@@ -1,0 +1,311 @@
+---
+title: Quick Start
+description: Write your first scaf test file
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Quick Start
+
+This guide walks you through writing your first scaf test file. We'll test a simple user lookup query.
+
+## Prerequisites
+
+- scaf CLI installed ([Installation](/getting-started/installation/))
+- A running Neo4j database (or other supported database)
+- A `.scaf.yaml` config file
+
+## Your First Test File
+
+<Steps>
+
+1. **Create the test file**
+
+   Create `users.scaf`:
+
+   ```scaf
+   // Define the query we want to test
+   query GetUser `
+   MATCH (u:User {id: $userId})
+   RETURN u.name, u.email, u.age
+   `
+   ```
+
+2. **Add global setup**
+
+   Set up test data that all tests will use:
+
+   ```scaf
+   setup `
+   MATCH (n) DETACH DELETE n
+   CREATE (alice:User {id: 1, name: "Alice", email: "alice@example.com", age: 30})
+   CREATE (bob:User {id: 2, name: "Bob", email: "bob@example.com", age: 25})
+   `
+   
+   teardown `
+   MATCH (n) DETACH DELETE n
+   `
+   ```
+
+3. **Write your first test**
+
+   ```scaf
+   GetUser {
+     test "finds Alice by id" {
+       // Input parameter
+       $userId: 1
+       
+       // Expected outputs
+       u.name: "Alice"
+       u.email: "alice@example.com"
+       u.age: 30
+     }
+   }
+   ```
+
+4. **Run the test**
+
+   ```bash
+   scaf test users.scaf
+   ```
+
+</Steps>
+
+## Complete Example
+
+Here's the full file:
+
+```scaf title="users.scaf"
+// Query definitions
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email, u.age
+`
+
+query CountUsers `
+MATCH (u:User)
+RETURN count(u) as count
+`
+
+// Global setup - runs once before all tests
+setup `
+MATCH (n) DETACH DELETE n
+CREATE (alice:User {id: 1, name: "Alice", email: "alice@example.com", age: 30})
+CREATE (bob:User {id: 2, name: "Bob", email: "bob@example.com", age: 25})
+`
+
+// Global teardown - runs after all tests
+teardown `
+MATCH (n) DETACH DELETE n
+`
+
+// Test scope for GetUser query
+GetUser {
+  test "finds Alice by id" {
+    $userId: 1
+    
+    u.name: "Alice"
+    u.email: "alice@example.com"
+    u.age: 30
+  }
+  
+  test "finds Bob by id" {
+    $userId: 2
+    
+    u.name: "Bob"
+    u.age: 25
+  }
+  
+  test "returns null for non-existent user" {
+    $userId: 999
+    
+    u.name: null
+    u.email: null
+  }
+}
+
+// Test scope for CountUsers query
+CountUsers {
+  test "counts all users" {
+    count: 2
+  }
+}
+```
+
+## Adding Groups
+
+Organize related tests with groups:
+
+```scaf
+GetUser {
+  group "existing users" {
+    test "finds Alice" {
+      $userId: 1
+      u.name: "Alice"
+    }
+    
+    test "finds Bob" {
+      $userId: 2
+      u.name: "Bob"
+    }
+  }
+  
+  group "edge cases" {
+    test "missing user" {
+      $userId: 999
+      u.name: null
+    }
+    
+    test "invalid id type" {
+      $userId: -1
+      u.name: null
+    }
+  }
+}
+```
+
+## Adding Assertions
+
+For complex validations, use `assert` blocks:
+
+```scaf
+GetUser {
+  test "user is a verified adult" {
+    $userId: 1
+    
+    u.name: "Alice"
+    
+    // Expression assertions
+    assert {
+      u.age >= 18;
+      u.email contains "@"
+    }
+  }
+  
+  test "verify user count with query" {
+    $userId: 1
+    
+    u.name: "Alice"
+    
+    // Query assertion - runs a separate query
+    assert CountUsers() { count == 2 }
+  }
+}
+```
+
+<Aside type="tip">
+  Assertions use [expr-lang](https://expr-lang.org/) syntax. You can use comparisons (`>`, `<`, `==`), logical operators (`&&`, `||`), and functions like `len()`, `contains()`.
+</Aside>
+
+## Test-Level Setup
+
+Add setup specific to individual tests:
+
+```scaf
+CountUsers {
+  test "counts base users" {
+    count: 2
+  }
+  
+  test "counts with temp user" {
+    // This setup only runs for this test
+    setup `
+    CREATE (:User {id: 999, name: "Temp"})
+    `
+    
+    count: 3
+  }
+  
+  test "temp user was rolled back" {
+    // Previous test's setup was in a transaction that rolled back
+    count: 2
+  }
+}
+```
+
+## Running Tests
+
+<Tabs>
+<TabItem label="Basic">
+
+```bash
+# Run all .scaf files in current directory
+scaf test
+
+# Run specific file
+scaf test users.scaf
+
+# Run files matching pattern
+scaf test ./queries/*.scaf
+```
+
+</TabItem>
+<TabItem label="Output Formats">
+
+```bash
+# Dots (default) - minimal output
+scaf test --format=dots
+
+# Verbose - full test names
+scaf test --format=verbose
+
+# JSON - machine-readable for tooling
+scaf test --format=json
+```
+
+</TabItem>
+<TabItem label="Filtering">
+
+```bash
+# Run tests matching a pattern
+scaf test --run="GetUser/existing"
+
+# Stop on first failure
+scaf test --fail-fast
+```
+
+</TabItem>
+</Tabs>
+
+## Understanding Output
+
+```
+$ scaf test users.scaf
+
+.....
+5 passed, 0 failed, 0 skipped (0.05s)
+```
+
+With verbose output:
+
+```
+$ scaf test users.scaf --format=verbose
+
+GetUser/finds Alice by id ... passed (0.01s)
+GetUser/finds Bob by id ... passed (0.01s)
+GetUser/returns null for non-existent user ... passed (0.01s)
+CountUsers/counts all users ... passed (0.01s)
+CountUsers/counts with temp user ... passed (0.01s)
+
+5 passed, 0 failed, 0 skipped (0.05s)
+```
+
+When a test fails:
+
+```
+$ scaf test users.scaf --format=verbose
+
+GetUser/finds Alice by id ... FAILED (0.01s)
+  field: u.name
+  expected: "Wrong Name"
+  actual: "Alice"
+
+0 passed, 1 failed, 0 skipped (0.02s)
+```
+
+## Next Steps
+
+- [DSL Overview](/dsl/overview/) — Full syntax reference
+- [Tests & Groups](/dsl/tests/) — Advanced test organization
+- [Assertions](/dsl/assertions/) — Expression-based validations
+- [Editor Integration](/editor/overview/) — Set up syntax highlighting

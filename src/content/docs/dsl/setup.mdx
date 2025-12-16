@@ -1,0 +1,359 @@
+---
+title: Setup & Teardown
+description: Preparing test data and cleaning up after tests
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Setup & Teardown
+
+Setup blocks prepare the database state before tests run. Teardown blocks clean up after tests complete. scaf supports setup at multiple levels with inheritance.
+
+## Inline Setup
+
+The simplest form — a raw query in backticks:
+
+```scaf
+setup `
+CREATE (alice:User {id: 1, name: "Alice", email: "alice@example.com"})
+CREATE (bob:User {id: 2, name: "Bob", email: "bob@example.com"})
+`
+```
+
+Multi-statement setup:
+
+```scaf
+setup `
+// Clear existing data
+MATCH (n) DETACH DELETE n
+
+// Create test users
+CREATE (alice:User {id: 1, name: "Alice", email: "alice@example.com", age: 30})
+CREATE (bob:User {id: 2, name: "Bob", email: "bob@example.com", age: 25})
+
+// Create relationships
+CREATE (alice)-[:FRIENDS_WITH]->(bob)
+`
+```
+
+## Teardown
+
+Runs after tests complete (in reverse order of setup):
+
+```scaf
+teardown `
+MATCH (n) DETACH DELETE n
+`
+```
+
+<Aside type="note">
+  Teardown is often unnecessary because tests run in transactions that roll back. Use teardown for cleanup that should persist across test files or for explicit data removal.
+</Aside>
+
+## Setup Levels
+
+Setup can be defined at four levels:
+
+### Suite Level
+
+Runs once at the start of the file:
+
+```scaf
+// This runs first, before any scope
+setup `
+CREATE (:Config {env: "test"})
+CREATE (alice:User {id: 1, name: "Alice"})
+CREATE (bob:User {id: 2, name: "Bob"})
+`
+
+GetUser {
+  test "uses suite data" {
+    $userId: 1
+    u.name: "Alice"  // Created by suite setup
+  }
+}
+```
+
+### Scope Level
+
+Runs for each query scope:
+
+```scaf
+GetUser {
+  // Runs before any test in this scope
+  setup `
+  CREATE (:Session {userId: 1, token: "abc123"})
+  `
+  
+  test "user has session" { ... }
+  test "another test" { ... }
+}
+
+CreateUser {
+  // Different setup for this scope
+  setup `
+  CREATE (:Sequence {name: "user_id", value: 100})
+  `
+  
+  test "creates user" { ... }
+}
+```
+
+### Group Level
+
+Runs for each group:
+
+```scaf
+GetUser {
+  group "with posts" {
+    setup `
+    CREATE (:Post {id: 1, authorId: 1, title: "First Post"})
+    CREATE (:Post {id: 2, authorId: 1, title: "Second Post"})
+    `
+    
+    test "user has posts" { ... }
+    test "post count" { ... }
+  }
+  
+  group "without posts" {
+    // No setup — user has no posts
+    test "new user" { ... }
+  }
+}
+```
+
+### Test Level
+
+Runs only for a specific test:
+
+```scaf
+CountUsers {
+  test "base count" {
+    count: 2
+  }
+  
+  test "with extra user" {
+    setup `CREATE (:User {id: 999, name: "Temp"})`
+    
+    count: 3
+  }
+  
+  test "back to base count" {
+    // Previous test's setup rolled back
+    count: 2
+  }
+}
+```
+
+## Setup Inheritance
+
+Tests inherit setup from all ancestor levels. Execution order:
+
+```
+Suite Setup → Scope Setup → Group Setup → Test Setup
+```
+
+Example:
+
+```scaf
+// 1. Suite setup
+setup `CREATE (:App {name: "test"})`
+
+GetUser {
+  // 2. Scope setup
+  setup `CREATE (:User {id: 1, name: "Alice"})`
+  
+  group "with profile" {
+    // 3. Group setup
+    setup `CREATE (:Profile {userId: 1, bio: "Hello"})`
+    
+    test "full setup chain" {
+      // 4. Test setup
+      setup `CREATE (:Preference {userId: 1, theme: "dark"})`
+      
+      // All four setups have run at this point
+      $userId: 1
+      u.name: "Alice"
+    }
+  }
+}
+```
+
+## Named Setup
+
+Reference setups defined elsewhere:
+
+### Import and Use
+
+```scaf
+import fixtures "./shared/fixtures"
+
+// Use imported setup
+setup fixtures.CreateUsers()
+```
+
+### With Parameters
+
+```scaf
+import fixtures "./shared/fixtures"
+
+// Pass parameters to setup
+setup fixtures.CreatePosts($count: 10, $authorId: 1)
+
+GetUser {
+  setup fixtures.AddFriends($userId: 1, $friendIds: [2, 3, 4])
+  
+  test "user with friends" {
+    $userId: 1
+    // ...
+  }
+}
+```
+
+### Defining Named Setups
+
+In `shared/fixtures.scaf`:
+
+```scaf
+query CreateUsers `
+CREATE (alice:User {id: 1, name: "Alice"})
+CREATE (bob:User {id: 2, name: "Bob"})
+`
+
+query CreatePosts `
+UNWIND range(1, $count) as i
+CREATE (:Post {id: i, authorId: $authorId, title: "Post " + i})
+`
+
+query AddFriends `
+MATCH (u:User {id: $userId})
+UNWIND $friendIds as friendId
+MATCH (f:User {id: friendId})
+CREATE (u)-[:FRIENDS_WITH]->(f)
+`
+```
+
+## Transaction Behavior
+
+### Default: Rollback
+
+By default, each test runs in a transaction that rolls back:
+
+```scaf
+CountUsers {
+  test "creates temp user - rolls back" {
+    setup `CREATE (:User {id: 999})`
+    count: 3  // Sees temp user
+  }
+  
+  test "temp user is gone" {
+    count: 2  // Transaction rolled back
+  }
+}
+```
+
+### Explicit Teardown
+
+For persistent cleanup:
+
+```scaf
+setup `
+// Create data that persists
+CREATE (:PersistentNode)
+`
+
+teardown `
+// Explicitly clean up
+MATCH (n:PersistentNode) DELETE n
+`
+```
+
+## Complex Setup Patterns
+
+### Conditional Data
+
+Use multiple groups with different setup:
+
+```scaf
+GetUser {
+  group "verified users" {
+    setup `CREATE (:User {id: 1, verified: true})`
+    
+    test "verified flag is true" {
+      $userId: 1
+      u.verified: true
+    }
+  }
+  
+  group "unverified users" {
+    setup `CREATE (:User {id: 1, verified: false})`
+    
+    test "verified flag is false" {
+      $userId: 1
+      u.verified: false
+    }
+  }
+}
+```
+
+### Incremental Setup
+
+Build on previous setup:
+
+```scaf
+setup `CREATE (:User {id: 1, name: "Alice"})`
+
+GetUser {
+  setup `
+  MATCH (u:User {id: 1})
+  SET u.verified = true
+  `
+  
+  group "with posts" {
+    setup `
+    MATCH (u:User {id: 1})
+    CREATE (u)-[:AUTHORED]->(:Post {title: "Post 1"})
+    `
+    
+    test "user has verified status and posts" {
+      $userId: 1
+      u.verified: true
+    }
+  }
+}
+```
+
+## Best Practices
+
+1. **Keep setup focused** — Only set up what's needed for the tests
+
+2. **Use inheritance** — Move common setup to higher levels
+
+3. **Prefer transactions** — Let rollback handle cleanup
+
+4. **Name setups clearly** — If importing, use descriptive function names
+
+5. **Document complex setup** — Add comments for non-obvious data
+
+```scaf
+// Good: Clear, minimal, commented
+setup `
+// Base users for all tests
+CREATE (alice:User {id: 1, name: "Alice", role: "admin"})
+CREATE (bob:User {id: 2, name: "Bob", role: "user"})
+// Admin has special permissions
+CREATE (alice)-[:HAS_PERMISSION]->(:Permission {name: "delete"})
+`
+
+GetUser {
+  // Only add what this scope needs
+  setup `CREATE (:Session {userId: 1})`
+  
+  group "with activity" {
+    // Only add what this group needs
+    setup `CREATE (:Login {userId: 1, time: timestamp()})`
+    
+    test "has recent login" { ... }
+  }
+}
+```

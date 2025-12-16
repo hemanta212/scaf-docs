@@ -1,0 +1,324 @@
+---
+title: Neovim (scaf.nvim)
+description: Setting up scaf in Neovim with scaf.nvim
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Neovim Setup
+
+[scaf.nvim](https://github.com/rlch/scaf.nvim) provides comprehensive Neovim support for scaf.
+
+## Features
+
+- **Syntax highlighting** with tree-sitter
+- **Language injection** — Query bodies highlighted as Cypher/SQL
+- **LSP integration** — Diagnostics and hover info
+- **Neotest adapter** — Run tests from Neovim
+
+## Installation
+
+<Tabs>
+<TabItem label="lazy.nvim">
+
+```lua
+{
+  "rlch/scaf.nvim",
+  dependencies = {
+    "nvim-treesitter/nvim-treesitter",
+  },
+  config = function()
+    require("scaf").setup({})
+  end,
+}
+```
+
+</TabItem>
+<TabItem label="packer.nvim">
+
+```lua
+use {
+  "rlch/scaf.nvim",
+  requires = { "nvim-treesitter/nvim-treesitter" },
+  config = function()
+    require("scaf").setup({})
+  end,
+}
+```
+
+</TabItem>
+</Tabs>
+
+## Tree-sitter Setup
+
+<Steps>
+
+1. **Add parser configuration**
+
+   Add to your nvim-treesitter config:
+
+   ```lua
+   local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
+   parser_config.scaf = {
+     install_info = {
+       url = "https://github.com/rlch/tree-sitter-scaf",
+       files = { "src/parser.c" },
+       branch = "main",
+     },
+     filetype = "scaf",
+   }
+   ```
+
+2. **Install the parser**
+
+   Run `:TSInstall scaf`
+
+3. **Verify installation**
+
+   Open a `.scaf` file and check highlighting works.
+
+</Steps>
+
+## Language Injection
+
+scaf.nvim automatically injects syntax highlighting for query bodies.
+
+### Dialect Detection
+
+The dialect for syntax highlighting is determined from the database configured in `.scaf.yaml`:
+
+```yaml
+neo4j:       # → Cypher highlighting
+  uri: bolt://localhost:7687
+
+# postgres:  # → SQL highlighting
+#   uri: postgres://localhost:5432/db
+```
+
+### Dialect Mappings
+
+| Dialect | Tree-sitter Language |
+|---------|---------------------|
+| `cypher`, `neo4j` | `cypher` |
+| `sql`, `postgres`, `mysql` | `sql` |
+
+Add custom mappings:
+
+```lua
+require("scaf").setup({
+  dialect_map = {
+    mongodb = "javascript",
+    graphql = "graphql",
+  },
+})
+```
+
+## LSP Setup
+
+### Automatic Start
+
+If `scaf-lsp` is in PATH, the LSP starts automatically.
+
+Install the LSP:
+
+```bash
+go install github.com/rlch/scaf/cmd/scaf-lsp@latest
+```
+
+### Configuration
+
+```lua
+require("scaf").setup({
+  lsp = {
+    -- Command to start LSP (default: {"scaf-lsp"})
+    cmd = { "scaf-lsp" },
+    -- Auto-start on .scaf files (default: true)
+    enabled = true,
+  },
+})
+```
+
+### Manual Start
+
+```lua
+require("scaf").start_lsp()
+```
+
+### With nvim-lspconfig
+
+```lua
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
+
+if not configs.scaf then
+  configs.scaf = {
+    default_config = require("scaf").get_lsp_config(),
+  }
+end
+
+lspconfig.scaf.setup({})
+```
+
+### Neovim 0.11+ Native LSP
+
+For Neovim 0.11+, scaf.nvim provides an auto-discovered LSP configuration:
+
+```lua
+vim.lsp.enable("scaf")
+```
+
+## Neotest Integration
+
+Run tests directly from Neovim using [neotest](https://github.com/nvim-neotest/neotest).
+
+### Installation
+
+```lua
+{
+  "nvim-neotest/neotest",
+  dependencies = {
+    "rlch/scaf.nvim",
+    -- other adapters...
+  },
+  config = function()
+    require("neotest").setup({
+      adapters = {
+        require("neotest-scaf"),
+      },
+    })
+  end,
+}
+```
+
+### Configuration
+
+```lua
+require("neotest").setup({
+  adapters = {
+    require("neotest-scaf")({
+      -- Command to run scaf (default: "scaf")
+      scaf_command = "scaf",
+      -- Additional arguments
+      args = {},
+    }),
+  },
+})
+```
+
+### Usage
+
+| Command | Description |
+|---------|-------------|
+| `:Neotest run` | Run test under cursor |
+| `:Neotest run file` | Run all tests in file |
+| `:Neotest output` | Show test output |
+| `:Neotest summary` | Toggle summary panel |
+
+### Test Discovery
+
+Neotest discovers:
+- **Query scopes** as namespaces
+- **Groups** as nested namespaces
+- **Tests** as test positions
+
+## API Reference
+
+### `require("scaf").setup(opts)`
+
+Configure the plugin.
+
+```lua
+require("scaf").setup({
+  -- Dialect to tree-sitter language mappings
+  dialect_map = {},
+  
+  -- LSP configuration
+  lsp = {
+    cmd = { "scaf-lsp" },
+    enabled = true,
+  },
+})
+```
+
+### `require("scaf").get_dialect(file_path)`
+
+Get the dialect for a file path.
+
+```lua
+local dialect = require("scaf").get_dialect("/path/to/file.scaf")
+-- Returns: "cypher", "sql", etc.
+```
+
+### `require("scaf").get_injection_language(bufnr)`
+
+Get the tree-sitter language for injections.
+
+```lua
+local lang = require("scaf").get_injection_language(0)
+-- Returns: "cypher", "sql", etc.
+```
+
+### `require("scaf").clear_cache()`
+
+Clear the config cache (useful after editing `.scaf.yaml`).
+
+### `require("scaf").start_lsp()`
+
+Manually start the LSP for the current buffer.
+
+### `require("scaf").get_lsp_config()`
+
+Get LSP configuration for use with nvim-lspconfig.
+
+## Keymaps
+
+Suggested keymaps for scaf development:
+
+```lua
+-- Run test under cursor
+vim.keymap.set("n", "<leader>tt", function()
+  require("neotest").run.run()
+end, { desc = "Run test" })
+
+-- Run all tests in file
+vim.keymap.set("n", "<leader>tf", function()
+  require("neotest").run.run(vim.fn.expand("%"))
+end, { desc = "Run file tests" })
+
+-- Show test output
+vim.keymap.set("n", "<leader>to", function()
+  require("neotest").output.open({ enter = true })
+end, { desc = "Test output" })
+
+-- Toggle summary
+vim.keymap.set("n", "<leader>ts", function()
+  require("neotest").summary.toggle()
+end, { desc = "Test summary" })
+```
+
+## Troubleshooting
+
+### Parser not found
+
+```
+Error: Parser not found for language scaf
+```
+
+Solution: Run `:TSInstall scaf` after adding the parser config.
+
+### Wrong highlighting in query bodies
+
+1. Check your `.scaf.yaml` database setting (e.g., `neo4j:` for Cypher)
+2. Clear cache: `:lua require("scaf").clear_cache()`
+
+### LSP not attaching
+
+1. Verify `scaf-lsp` is installed: `which scaf-lsp`
+2. Check `:LspInfo` while in a `.scaf` file
+3. Check `:LspLog` for errors
+
+### Neotest not discovering tests
+
+1. Ensure `neotest-scaf` adapter is configured
+2. Check file has `.scaf` extension
+3. Verify file parses correctly (no syntax errors)

@@ -1,0 +1,254 @@
+---
+title: Language Server
+description: Using scaf-lsp for diagnostics and editor features
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Language Server (scaf-lsp)
+
+`scaf-lsp` is the language server for scaf, providing diagnostics, hover information, and other IDE features.
+
+## Installation
+
+```bash
+go install github.com/rlch/scaf/cmd/scaf-lsp@latest
+```
+
+Verify installation:
+
+```bash
+scaf-lsp --version
+```
+
+## Features
+
+### Diagnostics
+
+Real-time error detection:
+- **Syntax errors** — Invalid scaf syntax
+- **Undefined queries** — Test scopes referencing undefined queries
+- **Duplicate definitions** — Queries or tests with same name
+- **Type mismatches** — Invalid value types in statements
+
+### Hover Information
+
+Hover over elements to see:
+- Query definitions and their bodies
+- Test descriptions and paths
+- Parameter documentation
+
+### Go to Definition
+
+Jump from:
+- Test scope → Query definition
+- Named setup → Imported setup
+- Import → File
+
+### Document Symbols
+
+Outline view showing:
+- Queries
+- Test scopes
+- Groups
+- Tests
+
+## Editor Setup
+
+<Tabs>
+<TabItem label="Neovim (scaf.nvim)">
+
+scaf.nvim starts the LSP automatically:
+
+```lua
+require("scaf").setup({
+  lsp = {
+    enabled = true,  -- default
+    cmd = { "scaf-lsp" },
+  },
+})
+```
+
+</TabItem>
+<TabItem label="Neovim (manual)">
+
+```lua
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "scaf",
+  callback = function()
+    vim.lsp.start({
+      name = "scaf-lsp",
+      cmd = { "scaf-lsp" },
+      root_dir = vim.fs.dirname(
+        vim.fs.find({ ".scaf.yaml", ".git" }, { upward = true })[1]
+      ),
+    })
+  end,
+})
+```
+
+</TabItem>
+<TabItem label="nvim-lspconfig">
+
+```lua
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
+
+if not configs.scaf then
+  configs.scaf = {
+    default_config = {
+      cmd = { "scaf-lsp" },
+      filetypes = { "scaf" },
+      root_dir = lspconfig.util.root_pattern(".scaf.yaml", ".git"),
+      single_file_support = true,
+    },
+  }
+end
+
+lspconfig.scaf.setup({})
+```
+
+</TabItem>
+<TabItem label="VS Code">
+
+<Aside type="note">
+  VS Code extension is planned. For now, use a generic LSP client extension.
+</Aside>
+
+</TabItem>
+</Tabs>
+
+## LSP Capabilities
+
+### Supported
+
+| Capability | Description |
+|------------|-------------|
+| `textDocument/publishDiagnostics` | Error/warning diagnostics |
+| `textDocument/hover` | Hover information |
+| `textDocument/definition` | Go to definition |
+| `textDocument/documentSymbol` | Document outline |
+
+### Planned
+
+| Capability | Description |
+|------------|-------------|
+| `textDocument/completion` | Auto-completion |
+| `textDocument/rename` | Rename symbol |
+| `textDocument/formatting` | Format document |
+| `textDocument/references` | Find references |
+
+## Configuration
+
+### Command Line Options
+
+```bash
+# Verbose logging
+scaf-lsp --verbose
+
+# Custom log file
+scaf-lsp --log-file=/tmp/scaf-lsp.log
+
+# TCP mode (for debugging)
+scaf-lsp --tcp --port=9999
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `SCAF_LSP_LOG` | Log level (debug, info, warn, error) |
+| `SCAF_LSP_LOG_FILE` | Log file path |
+
+## Diagnostics
+
+### Error Types
+
+**Syntax Error**
+```
+users.scaf:5:1: error: unexpected token 'test', expected '}'
+```
+
+**Undefined Query**
+```
+users.scaf:10:1: error: undefined query 'GetUsr' (did you mean 'GetUser'?)
+```
+
+**Duplicate Definition**
+```
+users.scaf:15:1: warning: duplicate query definition 'GetUser'
+```
+
+**Import Error**
+```
+users.scaf:1:8: error: cannot find module './shared/fixtures'
+```
+
+### Diagnostic Severity
+
+| Severity | Description |
+|----------|-------------|
+| Error | Parse errors, undefined references |
+| Warning | Duplicate definitions, unused queries |
+| Information | Style suggestions |
+| Hint | Best practice recommendations |
+
+## Troubleshooting
+
+### LSP Not Starting
+
+1. Verify installation:
+   ```bash
+   which scaf-lsp
+   scaf-lsp --version
+   ```
+
+2. Check PATH in your shell:
+   ```bash
+   echo $PATH
+   ```
+
+3. Try running manually:
+   ```bash
+   echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"capabilities":{}}}' | scaf-lsp
+   ```
+
+### No Diagnostics
+
+1. Check filetype: `:set ft?` should show `scaf`
+2. Check LSP is attached: `:LspInfo`
+3. Enable verbose logging and check output
+
+### Performance Issues
+
+1. Large files may cause lag
+2. Try disabling real-time diagnostics
+3. File an issue with reproduction steps
+
+## Development
+
+### Building from Source
+
+```bash
+git clone https://github.com/rlch/scaf
+cd scaf
+go build ./cmd/scaf-lsp
+```
+
+### Running Tests
+
+```bash
+go test ./lsp/...
+```
+
+### Debug Mode
+
+Run with TCP for easier debugging:
+
+```bash
+# Terminal 1
+scaf-lsp --tcp --port=9999
+
+# Terminal 2 (connect with netcat)
+nc localhost 9999
+```

@@ -1,0 +1,273 @@
+---
+title: Databases
+description: Database support in scaf
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Databases
+
+scaf separates the concepts of **databases** (execution targets) and **dialects** (query languages):
+
+- **Database**: Where queries run (Neo4j, PostgreSQL, MySQL, SQLite)
+- **Dialect**: The query language used (Cypher, SQL)
+
+This allows multiple databases to share a dialect. For example, PostgreSQL, MySQL, and SQLite all use the SQL dialect.
+
+## Supported Databases
+
+| Database | Dialect | Status | Driver |
+|----------|---------|--------|--------|
+| Neo4j | Cypher | ✅ Available | neo4j-go-driver |
+| PostgreSQL | SQL | 🚧 Coming soon | pgx |
+| MySQL | SQL | 🚧 Coming soon | go-sql-driver |
+| SQLite | SQL | 🚧 Coming soon | modernc.org/sqlite |
+
+## Neo4j
+
+Neo4j is the graph database using the Cypher query language.
+
+### Configuration
+
+```yaml
+neo4j:
+  uri: bolt://localhost:7687
+  username: neo4j
+  password: password
+  database: neo4j  # optional, defaults to neo4j
+```
+
+### Connection URI Formats
+
+```yaml
+# Standard bolt protocol
+uri: bolt://localhost:7687
+
+# Bolt with routing (cluster)
+uri: neo4j://cluster.example.com:7687
+
+# With SSL
+uri: bolt+s://secure.example.com:7687
+uri: neo4j+s://secure.example.com:7687
+```
+
+### Example Queries
+
+```scaf
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email, u.age
+`
+
+query GetUserWithFriends `
+MATCH (u:User {id: $userId})-[:FRIENDS_WITH]->(f:User)
+RETURN u.name, collect(f.name) as friends
+`
+
+query CreateUser `
+CREATE (u:User {id: $id, name: $name, email: $email})
+RETURN u
+`
+```
+
+### Cypher Features
+
+Supported Cypher clauses:
+- `MATCH`, `OPTIONAL MATCH`
+- `CREATE`, `MERGE`
+- `SET`, `REMOVE`
+- `DELETE`, `DETACH DELETE`
+- `RETURN`, `WITH`
+- `WHERE`, `ORDER BY`, `LIMIT`, `SKIP`
+- `UNWIND`, `FOREACH`
+- `CALL` (procedures)
+- `UNION`, `UNION ALL`
+
+## PostgreSQL (Coming Soon)
+
+<Aside type="note">
+  PostgreSQL support is in development.
+</Aside>
+
+### Planned Configuration
+
+```yaml
+postgres:
+  host: localhost
+  port: 5432
+  database: mydb
+  user: postgres
+  password: password
+  sslmode: disable  # disable, require, verify-ca, verify-full
+```
+
+Or using a connection URI:
+
+```yaml
+postgres:
+  uri: postgres://postgres:password@localhost:5432/mydb?sslmode=disable
+```
+
+### Example SQL Queries
+
+```scaf
+query GetUser `
+SELECT name, email, age
+FROM users
+WHERE id = $userId
+`
+
+query GetUserWithPosts `
+SELECT 
+  u.name,
+  u.email,
+  COUNT(p.id) as post_count
+FROM users u
+LEFT JOIN posts p ON p.author_id = u.id
+WHERE u.id = $userId
+GROUP BY u.id, u.name, u.email
+`
+
+query CreateUser `
+INSERT INTO users (id, name, email)
+VALUES ($id, $name, $email)
+RETURNING id, name, email
+`
+```
+
+## MySQL (Coming Soon)
+
+<Aside type="note">
+  MySQL support is planned.
+</Aside>
+
+### Planned Configuration
+
+```yaml
+mysql:
+  host: localhost
+  port: 3306
+  database: mydb
+  user: root
+  password: password
+```
+
+## SQLite (Coming Soon)
+
+<Aside type="note">
+  SQLite support is planned.
+</Aside>
+
+### Planned Configuration
+
+```yaml
+sqlite:
+  path: ./test.db
+  # or :memory: for in-memory database
+```
+
+## Dialects
+
+Each database uses a specific query dialect:
+
+### Cypher Dialect
+
+Used by: **Neo4j**
+
+Graph query language for pattern matching:
+
+```scaf
+query Example `
+MATCH (n:Node {prop: $value})-[r:RELATES_TO]->(m)
+RETURN n.name, type(r), m.name
+`
+```
+
+### SQL Dialect
+
+Used by: **PostgreSQL**, **MySQL**, **SQLite**
+
+Standard SQL with database-specific extensions:
+
+```scaf
+query Example `
+SELECT name FROM nodes WHERE prop = $value
+`
+```
+
+## Parameter Syntax
+
+All databases use `$paramName` for parameters:
+
+```scaf
+query Example `
+-- Works in both Cypher and SQL
+WHERE id = $userId AND status = $status
+`
+```
+
+## Return Value Mapping
+
+Databases map results to scaf's value types:
+
+| Database Type | scaf Type |
+|---------------|-----------|
+| String | `string` |
+| Integer | `number` |
+| Float | `number` |
+| Boolean | `boolean` |
+| Null | `null` |
+| Array/List | `list` |
+| Map/Object | `map` |
+| Date/Time | `string` (ISO format) |
+
+### Neo4j-Specific Types
+
+Neo4j nodes and relationships are flattened in results:
+
+```scaf
+query GetUser `
+MATCH (u:User {id: $id})
+RETURN u
+`
+
+// Result keys: u.name, u.email, u.labels, u.elementId
+```
+
+## Database Comparison
+
+<Tabs>
+<TabItem label="Neo4j (Cypher)">
+
+```scaf
+query GetUserWithRelations `
+MATCH (u:User {id: $userId})
+OPTIONAL MATCH (u)-[:FRIENDS_WITH]->(f:User)
+OPTIONAL MATCH (u)-[:AUTHORED]->(p:Post)
+RETURN 
+  u.name,
+  collect(DISTINCT f.name) as friends,
+  collect(DISTINCT p.title) as posts
+`
+```
+
+</TabItem>
+<TabItem label="PostgreSQL (SQL)">
+
+```scaf
+query GetUserWithRelations `
+SELECT 
+  u.name,
+  array_agg(DISTINCT f.name) as friends,
+  array_agg(DISTINCT p.title) as posts
+FROM users u
+LEFT JOIN friendships fr ON fr.user_id = u.id
+LEFT JOIN users f ON f.id = fr.friend_id
+LEFT JOIN posts p ON p.author_id = u.id
+WHERE u.id = $userId
+GROUP BY u.id, u.name
+`
+```
+
+</TabItem>
+</Tabs>

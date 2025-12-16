@@ -1,0 +1,200 @@
+---
+title: scaf.yaml
+description: Configuring scaf with YAML
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# scaf.yaml
+
+scaf uses a `.scaf.yaml` configuration file in your project root.
+
+## Minimal Configuration
+
+```yaml
+neo4j:
+  uri: bolt://localhost:7687
+  username: neo4j
+  password: password
+```
+
+The presence of a database key (like `neo4j:`) determines which database to use.
+
+## Full Configuration
+
+```yaml
+# Neo4j database configuration
+neo4j:
+  uri: bolt://localhost:7687
+  username: neo4j
+  password: password
+  database: neo4j  # optional
+
+# Code generation settings
+generate:
+  lang: go
+  adapter: neogo  # inferred from neo4j + go if not set
+  out: ./generated
+  package: queries
+```
+
+## Database Configuration
+
+Configure exactly one database. The database key determines the dialect automatically.
+
+### Neo4j
+
+```yaml
+neo4j:
+  # Connection URI (required)
+  uri: bolt://localhost:7687
+  
+  # Authentication
+  username: neo4j
+  password: password
+  
+  # Target database (optional, defaults to neo4j)
+  database: neo4j
+```
+
+URI formats:
+- `bolt://host:7687` — Standard connection
+- `neo4j://host:7687` — Routing/cluster connection
+- `bolt+s://host:7687` — SSL encrypted
+- `neo4j+s://host:7687` — SSL with routing
+
+### PostgreSQL (Coming Soon)
+
+```yaml
+postgres:
+  # Individual fields
+  host: localhost
+  port: 5432
+  database: mydb
+  user: postgres
+  password: password
+  sslmode: disable
+
+  # Or connection URI
+  uri: postgres://user:pass@localhost:5432/mydb?sslmode=disable
+```
+
+## Code Generation
+
+Settings for `scaf generate`:
+
+```yaml
+generate:
+  # Target language (required for generate)
+  lang: go
+  
+  # Database adapter (usually inferred)
+  adapter: neogo
+  
+  # Output directory
+  out: ./queries
+  
+  # Go package name
+  package: queries
+```
+
+### Adapter Inference
+
+If `adapter` is not set, it's inferred from the database and language:
+
+| Database | Language | Default Adapter |
+|----------|----------|-----------------|
+| neo4j | go | neogo |
+| postgres | go | pgx |
+| mysql | go | mysql |
+| sqlite | go | sqlite |
+
+## Environment Variables
+
+Override config with environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `SCAF_URI` | Database URI |
+| `SCAF_USER` | Database username |
+| `SCAF_PASS` | Database password |
+
+```bash
+SCAF_PASS=secret scaf test
+```
+
+Command-line flags also override config:
+
+```bash
+scaf test --uri bolt://localhost:7687 --username neo4j --password secret
+```
+
+## Config File Location
+
+scaf looks for configuration in order:
+
+1. `.scaf.yaml` in current directory
+2. `.scaf.yml` in current directory
+3. `scaf.yaml` in current directory
+4. `scaf.yml` in current directory
+5. Same patterns in parent directories (up to filesystem root)
+
+## Example Configurations
+
+### Neo4j Local Development
+
+```yaml
+neo4j:
+  uri: bolt://localhost:7687
+  username: neo4j
+  password: password
+
+generate:
+  lang: go
+  out: ./internal/queries
+  package: queries
+```
+
+### PostgreSQL with Docker
+
+```yaml
+postgres:
+  host: localhost
+  port: 5432
+  database: testdb
+  user: postgres
+  password: postgres
+  sslmode: disable
+
+generate:
+  lang: go
+  adapter: pgx
+```
+
+### CI/CD Configuration
+
+Use environment variables for secrets:
+
+```yaml
+neo4j:
+  uri: ${NEO4J_URI:-bolt://localhost:7687}
+  username: ${NEO4J_USER:-neo4j}
+  password: ${NEO4J_PASSWORD}
+```
+
+```bash
+# In CI
+export NEO4J_URI=bolt://neo4j-service:7687
+export NEO4J_USER=neo4j
+export NEO4J_PASSWORD=$SECRET_PASSWORD
+scaf test
+```
+
+Or use flags:
+
+```bash
+scaf test \
+  --uri "$NEO4J_URI" \
+  --username "$NEO4J_USER" \
+  --password "$NEO4J_PASSWORD"
+```

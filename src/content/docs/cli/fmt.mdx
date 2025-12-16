@@ -1,0 +1,205 @@
+---
+title: scaf fmt
+description: Formatting scaf files
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# scaf fmt
+
+The `fmt` command formats scaf files to a consistent style.
+
+## Basic Usage
+
+```bash
+# Format all .scaf files in current directory
+scaf fmt
+
+# Format specific file
+scaf fmt queries/users.scaf
+
+# Format files in a directory
+scaf fmt ./queries/
+```
+
+## Options
+
+### `--write`, `-w`
+
+Write changes back to files (default: false):
+
+```bash
+# Preview changes (dry run)
+scaf fmt queries/users.scaf
+
+# Apply changes
+scaf fmt --write queries/users.scaf
+scaf fmt -w queries/users.scaf
+```
+
+### `--check`
+
+Exit with error if files need formatting (useful for CI):
+
+```bash
+scaf fmt --check
+```
+
+Returns exit code 1 if any files would change.
+
+### `--diff`
+
+Show diff of changes:
+
+```bash
+scaf fmt --diff queries/users.scaf
+```
+
+## Formatting Rules
+
+### Indentation
+
+Two spaces for all indentation:
+
+```scaf
+GetUser {
+  group "tests" {
+    test "example" {
+      $userId: 1
+      
+      u.name: "Alice"
+    }
+  }
+}
+```
+
+### Blank Lines
+
+- One blank line between top-level elements (queries, setup, scopes)
+- One blank line between groups
+- One blank line between tests in a group
+- Blank line between inputs and outputs in a test
+
+```scaf
+query GetUser `...`
+
+query CreateUser `...`
+
+setup `...`
+
+GetUser {
+  group "first" {
+    test "a" {
+      $userId: 1
+      
+      u.name: "Alice"
+    }
+    
+    test "b" {
+      $userId: 2
+      
+      u.name: "Bob"
+    }
+  }
+  
+  group "second" {
+    test "c" { ... }
+  }
+}
+```
+
+### Query Bodies
+
+Query bodies are formatted as-is (preserving your SQL/Cypher formatting):
+
+```scaf
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email, u.age
+`
+```
+
+### Comments
+
+Comments are preserved and aligned:
+
+```scaf
+// This is a top-level comment
+query GetUser `...`
+
+GetUser {
+  // Group comment
+  group "tests" {
+    test "example" {
+      $userId: 1  // Inline comment
+      
+      u.name: "Alice"
+    }
+  }
+}
+```
+
+### Statement Alignment
+
+Colons in statements are aligned within a block:
+
+```scaf
+test "aligned" {
+  $userId:        1
+  $includeDeleted: false
+  
+  u.name:     "Alice"
+  u.email:    "alice@example.com"
+  u.verified: true
+}
+```
+
+## CI Integration
+
+### GitHub Actions
+
+```yaml
+- name: Check formatting
+  run: scaf fmt --check
+```
+
+### Pre-commit Hook
+
+```bash
+#!/bin/sh
+scaf fmt --check || {
+  echo "Run 'scaf fmt -w' to fix formatting"
+  exit 1
+}
+```
+
+## Examples
+
+### Format All Files
+
+```bash
+# Dry run
+scaf fmt
+
+# Apply changes
+scaf fmt -w
+```
+
+### Check Before Commit
+
+```bash
+# Check formatting
+if scaf fmt --check; then
+  echo "Formatting OK"
+else
+  echo "Run: scaf fmt -w"
+  exit 1
+fi
+```
+
+### View Changes
+
+```bash
+# See what would change
+scaf fmt --diff queries/users.scaf
+```

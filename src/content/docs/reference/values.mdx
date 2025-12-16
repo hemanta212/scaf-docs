@@ -1,0 +1,282 @@
+---
+title: Value Types
+description: Data types and literals in scaf
+---
+
+# Value Types
+
+scaf supports several value types for inputs, expected outputs, and assertions.
+
+## Strings
+
+### Quoted Strings
+
+Double or single quotes:
+
+```scaf
+name: "Alice"
+status: 'active'
+message: "Hello, World!"
+path: '/usr/local/bin'
+```
+
+### Escape Sequences
+
+```scaf
+// In quoted strings
+escaped: "Line 1\nLine 2"
+tab: "Column1\tColumn2"
+quote: "She said \"Hello\""
+backslash: "C:\\path\\to\\file"
+```
+
+| Escape | Character |
+|--------|-----------|
+| `\"` | Double quote |
+| `\'` | Single quote |
+| `\\` | Backslash |
+| `\n` | Newline |
+| `\t` | Tab |
+| `\r` | Carriage return |
+
+### Raw Strings
+
+Backtick-delimited, no escape processing:
+
+```scaf
+query Example `
+  SELECT * FROM users
+  WHERE name = 'Alice'
+`
+```
+
+Raw strings preserve all content literally, including newlines and special characters.
+
+## Numbers
+
+### Integers
+
+```scaf
+count: 42
+negative: -17
+zero: 0
+```
+
+### Floats
+
+```scaf
+price: 19.99
+rate: 0.05
+negative: -3.14
+```
+
+### Alternate Bases
+
+```scaf
+// Hexadecimal
+hex: 0xFF
+hex2: 0x1a2b3c
+
+// Binary
+binary: 0b1010
+bits: 0b11110000
+
+// Octal
+octal: 0o755
+permissions: 0o644
+```
+
+### Scientific Notation
+
+```scaf
+large: 1e10
+small: 1.5e-5
+precise: 6.022e23
+```
+
+### Underscores
+
+Underscores improve readability:
+
+```scaf
+million: 1_000_000
+binary: 0b1111_0000_1111_0000
+hex: 0xFF_FF_FF
+```
+
+## Booleans
+
+```scaf
+verified: true
+deleted: false
+```
+
+Case-sensitive — `True`, `TRUE`, `FALSE` are invalid.
+
+## Null
+
+```scaf
+deletedAt: null
+optionalField: null
+```
+
+Use `null` to assert that a field is null/missing.
+
+## Lists
+
+Ordered collections:
+
+```scaf
+// Empty list
+empty: []
+
+// Simple values
+numbers: [1, 2, 3, 4, 5]
+strings: ["a", "b", "c"]
+mixed: [1, "two", true, null]
+
+// Nested lists
+matrix: [[1, 2], [3, 4], [5, 6]]
+
+// Trailing comma allowed
+items: [
+  "first",
+  "second",
+  "third",
+]
+```
+
+### List in Assertions
+
+```scaf
+assert {
+  len(items) > 0;
+  items[0] == "first";
+  "admin" in roles
+}
+```
+
+## Maps
+
+Key-value objects:
+
+```scaf
+// Empty map
+empty: {}
+
+// Simple map
+user: {name: "Alice", age: 30}
+
+// Nested maps
+config: {
+  database: {
+    host: "localhost",
+    port: 5432
+  },
+  cache: {
+    enabled: true,
+    ttl: 3600
+  }
+}
+
+// Trailing comma allowed
+options: {
+  key1: "value1",
+  key2: "value2",
+}
+```
+
+### Map Keys
+
+Keys must be valid identifiers (no quotes):
+
+```scaf
+// Valid
+data: {name: "Alice", userId: 1}
+
+// Invalid - no quoted keys
+data: {"user-name": "Alice"}  // Error!
+```
+
+### Map in Assertions
+
+```scaf
+assert {
+  user.name == "Alice";
+  user.profile.theme == "dark";
+  config["timeout"] > 0
+}
+```
+
+## Type Coercion
+
+scaf compares values with type awareness:
+
+| Expected | Actual | Result |
+|----------|--------|--------|
+| `1` (int) | `1.0` (float) | Match ✓ |
+| `"1"` (string) | `1` (number) | No match ✗ |
+| `true` | `1` | No match ✗ |
+| `null` | missing field | Match ✓ |
+| `[]` | `[]` | Match ✓ |
+| `[1, 2]` | `[2, 1]` | No match ✗ (order matters) |
+
+## Nested Structures
+
+Complex nested data:
+
+```scaf
+test "complex data" {
+  $input: {
+    users: [
+      {id: 1, name: "Alice", roles: ["admin", "user"]},
+      {id: 2, name: "Bob", roles: ["user"]}
+    ],
+    config: {
+      features: {
+        beta: true,
+        legacy: false
+      }
+    }
+  }
+  
+  result.users[0].name: "Alice"
+  result.users[0].roles: ["admin", "user"]
+  result.config.features.beta: true
+}
+```
+
+## Database Type Mapping
+
+How database types map to scaf types:
+
+### Neo4j/Cypher
+
+| Neo4j Type | scaf Type |
+|------------|-----------|
+| String | `string` |
+| Integer | `number` |
+| Float | `number` |
+| Boolean | `boolean` |
+| Null | `null` |
+| List | `list` |
+| Map | `map` |
+| Node | `map` (properties) |
+| Relationship | `map` (properties) |
+| Date | `string` (ISO format) |
+| DateTime | `string` (ISO format) |
+| Duration | `string` |
+
+### SQL (Coming)
+
+| SQL Type | scaf Type |
+|----------|-----------|
+| VARCHAR, TEXT | `string` |
+| INT, BIGINT | `number` |
+| FLOAT, DECIMAL | `number` |
+| BOOLEAN | `boolean` |
+| NULL | `null` |
+| ARRAY | `list` |
+| JSON, JSONB | `map` |
+| DATE | `string` (ISO format) |
+| TIMESTAMP | `string` (ISO format) |

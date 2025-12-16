@@ -1,0 +1,366 @@
+---
+title: Assertions
+description: Expression-based and query-based assertions in scaf
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Assertions
+
+Beyond simple output matching, scaf supports powerful assertions using expressions and additional queries.
+
+## Output Matching vs Assertions
+
+**Output matching** checks exact values:
+
+```scaf
+test "exact match" {
+  $userId: 1
+  
+  u.name: "Alice"      // Must equal "Alice"
+  u.age: 30            // Must equal 30
+  u.verified: true     // Must equal true
+}
+```
+
+**Assertions** allow complex expressions:
+
+```scaf
+test "with assertions" {
+  $userId: 1
+  
+  u.name: "Alice"
+  
+  // Expressions - more flexible
+  assert {
+    u.age >= 18;
+    u.age < 100;
+    u.verified == true
+  }
+}
+```
+
+## Expression Assertions
+
+Use `assert { }` with one or more expressions:
+
+```scaf
+test "expression examples" {
+  $userId: 1
+  
+  assert {
+    // Comparisons
+    u.age >= 18;
+    u.age < 100;
+    
+    // Equality
+    u.name == "Alice";
+    u.status != "banned";
+    
+    // Logical operators
+    u.verified == true && u.age >= 18;
+    u.role == "admin" || u.role == "moderator";
+    
+    // String operations
+    u.email contains "@";
+    u.name startsWith "A";
+    u.domain endsWith ".com";
+    
+    // Length checks
+    len(u.name) > 0;
+    len(u.tags) >= 1;
+    
+    // Null checks
+    u.deletedAt == nil;
+    u.profile != nil
+  }
+}
+```
+
+<Aside type="tip">
+  Multiple expressions are separated by semicolons. All must pass for the test to pass.
+</Aside>
+
+## Expression Language
+
+scaf uses [expr-lang](https://expr-lang.org/) for assertions. Available features:
+
+### Comparison Operators
+
+| Operator | Description |
+|----------|-------------|
+| `==` | Equal |
+| `!=` | Not equal |
+| `<` | Less than |
+| `>` | Greater than |
+| `<=` | Less than or equal |
+| `>=` | Greater than or equal |
+
+### Logical Operators
+
+| Operator | Description |
+|----------|-------------|
+| `&&` | Logical AND |
+| `\|\|` | Logical OR |
+| `!` | Logical NOT |
+
+### Arithmetic Operators
+
+| Operator | Description |
+|----------|-------------|
+| `+` | Addition |
+| `-` | Subtraction |
+| `*` | Multiplication |
+| `/` | Division |
+| `%` | Modulo |
+
+### String Operators
+
+| Operator | Description |
+|----------|-------------|
+| `contains` | String contains substring |
+| `startsWith` | String starts with prefix |
+| `endsWith` | String ends with suffix |
+| `matches` | Regex match |
+
+### Built-in Functions
+
+| Function | Description |
+|----------|-------------|
+| `len(x)` | Length of string/array |
+| `abs(x)` | Absolute value |
+| `min(a, b)` | Minimum value |
+| `max(a, b)` | Maximum value |
+| `floor(x)` | Round down |
+| `ceil(x)` | Round up |
+
+### Collection Access
+
+```scaf
+assert {
+  // Array access
+  u.tags[0] == "admin";
+  len(u.tags) > 0;
+  
+  // Map access
+  u.metadata.theme == "dark";
+  u.settings["notifications"] == true;
+  
+  // Check if contains
+  "admin" in u.roles
+}
+```
+
+### Ternary Operator
+
+```scaf
+assert {
+  u.verified ? u.status == "active" : u.status == "pending"
+}
+```
+
+### Optional Chaining
+
+```scaf
+assert {
+  // Safe access - won't error if profile is nil
+  u.profile?.bio != "";
+  u.settings?.theme == "dark"
+}
+```
+
+## Query Assertions
+
+Run additional queries and assert on their results:
+
+### Inline Query
+
+```scaf
+test "verify side effects" {
+  $userId: 1
+  
+  u.name: "Alice"
+  
+  // Run a separate query, assert on results
+  assert `
+  MATCH (p:Post {authorId: 1})
+  RETURN count(p) as postCount
+  ` {
+    postCount > 0;
+    postCount < 100
+  }
+}
+```
+
+### Named Query
+
+Reference a defined query:
+
+```scaf
+query CountPosts `
+MATCH (p:Post {authorId: $authorId})
+RETURN count(p) as count
+`
+
+GetUser {
+  test "user has posts" {
+    $userId: 1
+    
+    u.name: "Alice"
+    
+    // Use the named query
+    assert CountPosts($authorId: 1) {
+      count > 0
+    }
+  }
+}
+```
+
+### Query with Field References
+
+Pass values from the main query to the assertion query:
+
+```scaf
+test "verify created data" {
+  $userId: 1
+  
+  u.id: 1
+  u.name: "Alice"
+  
+  // Use u.id from main query result
+  assert CountPosts($authorId: u.id) {
+    count >= 0
+  }
+}
+```
+
+## Combining Output and Assertions
+
+You can mix output matching with assertions:
+
+```scaf
+test "comprehensive validation" {
+  $userId: 1
+  
+  // Exact matches
+  u.name: "Alice"
+  u.email: "alice@example.com"
+  
+  // Expression assertions
+  assert {
+    u.age >= 18;
+    u.verified == true
+  }
+  
+  // Query assertions
+  assert `MATCH (s:Session {userId: 1}) RETURN count(s) as c` {
+    c > 0
+  }
+  
+  // Named query assertion
+  assert CountPosts($authorId: 1) {
+    count >= 0
+  }
+}
+```
+
+## Multiple Assert Blocks
+
+You can have multiple assert blocks:
+
+```scaf
+test "multiple assertion groups" {
+  $userId: 1
+  
+  u.name: "Alice"
+  
+  // Age validations
+  assert {
+    u.age >= 18;
+    u.age < 120
+  }
+  
+  // Email validations
+  assert {
+    u.email contains "@";
+    len(u.email) > 5
+  }
+  
+  // Relationship validations
+  assert `MATCH (u:User {id: 1})-[:KNOWS]-(f) RETURN count(f) as friends` {
+    friends >= 0
+  }
+}
+```
+
+## Assertion Failure Messages
+
+When an assertion fails, scaf reports:
+
+- The expression that failed
+- The actual values involved
+- The assertion block location
+
+```
+test "user is adult" FAILED
+  assertion failed: u.age >= 18
+  u.age = 15
+```
+
+## Best Practices
+
+1. **Use output matching for exact values** — It's simpler and more readable
+
+2. **Use assertions for ranges and conditions** — `u.age >= 18` is clearer than checking exact age
+
+3. **Group related assertions** — Keep validation logic organized
+
+4. **Use query assertions for side effects** — Verify data was created/modified correctly
+
+5. **Prefer named queries** — Reusable and more readable than inline queries
+
+<Tabs>
+<TabItem label="Good">
+
+```scaf
+test "user creation" {
+  $name: "Alice"
+  $email: "alice@example.com"
+  
+  // Exact match for returned values
+  u.name: "Alice"
+  u.email: "alice@example.com"
+  
+  // Assertions for derived/computed values
+  assert {
+    u.id > 0;          // Auto-generated
+    u.createdAt != nil // Auto-set
+  }
+  
+  // Verify in database
+  assert CountUsers() { count >= 1 }
+}
+```
+
+</TabItem>
+<TabItem label="Avoid">
+
+```scaf
+test "user creation" {
+  $name: "Alice"
+  $email: "alice@example.com"
+  
+  // Unnecessary assertion for exact value
+  assert { u.name == "Alice" }
+  
+  // Everything inline
+  assert `MATCH (u:User) WHERE u.name = "Alice" RETURN u.id as id, u.email as email, count(*) as c` {
+    id > 0;
+    email == "alice@example.com";
+    c == 1
+  }
+}
+```
+
+</TabItem>
+</Tabs>

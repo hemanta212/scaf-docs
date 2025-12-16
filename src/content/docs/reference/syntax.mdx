@@ -1,0 +1,380 @@
+---
+title: Syntax Reference
+description: Complete syntax reference for the scaf DSL
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# Syntax Reference
+
+This page provides a complete reference for the scaf DSL syntax with examples.
+
+## Imports
+
+Import shared fixtures and setup modules:
+
+```scaf
+// Simple import
+import "../../setup/db"
+
+// Import with alias
+import fixtures "../shared/fixtures"
+
+// Multiple imports
+import "../../setup/db"
+import fixtures "../shared/fixtures"
+import utils "./utils"
+```
+
+## Query Definitions
+
+Define named database queries using backtick-delimited raw strings:
+
+```scaf
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name
+`
+
+query CreateUser `INSERT INTO users (name) VALUES ($name)`
+```
+
+## Setup and Teardown
+
+### Global Setup
+
+Setup blocks run before tests:
+
+```scaf
+setup `
+CREATE (u:User {id: 1, name: "Alice"})
+`
+```
+
+### Named Setup
+
+Reference setup functions from imported modules:
+
+```scaf
+import fixtures "../shared/fixtures"
+
+// Simple named setup
+setup fixtures.CreateUsers()
+
+// With parameters
+setup fixtures.CreatePosts($count: 10, $authorId: 1)
+```
+
+### Teardown
+
+Teardown blocks run after tests:
+
+```scaf
+teardown `MATCH (n) DETACH DELETE n`
+```
+
+## Query Scopes
+
+Group tests by the query they exercise:
+
+```scaf
+GetUser {
+  test "finds user" {
+    $userId: 1
+    u.name: "Alice"
+  }
+}
+```
+
+## Groups
+
+Organize related tests with hierarchical groups:
+
+```scaf
+GetUser {
+  group "existing users" {
+    setup `CREATE (:Session)`
+
+    test "finds alice" {
+      $userId: 1
+    }
+
+    test "finds bob" {
+      $userId: 2
+    }
+  }
+}
+```
+
+### Nested Groups
+
+Groups can be nested arbitrarily deep:
+
+```scaf
+GetUser {
+  group "outer" {
+    group "inner" {
+      test "deep test" {
+      }
+    }
+  }
+}
+```
+
+## Tests
+
+### Basic Test Structure
+
+Tests contain inputs (prefixed with `$`), expected outputs, and optional assertions:
+
+```scaf
+GetUser {
+  test "finds user by id" {
+    $userId: 1
+    u.name: "Alice"
+    u.email: "alice@example.com"
+  }
+}
+```
+
+### Test with Setup
+
+Tests can have their own setup blocks:
+
+```scaf
+GetUser {
+  test "with setup" {
+    setup `CREATE (:Data)`
+    $id: 1
+  }
+}
+```
+
+## Values
+
+### Primitive Values
+
+```scaf
+Q {
+  test "primitives" {
+    // String values
+    name: "Alice"
+
+    // Integer values
+    count: 42
+
+    // Float values
+    price: 3.14
+
+    // Negative numbers
+    balance: -100
+
+    // Boolean values
+    active: true
+    deleted: false
+
+    // Null values
+    email: null
+  }
+}
+```
+
+### Collections
+
+```scaf
+Q {
+  test "collections" {
+    // List values
+    tags: ["go", "testing", "dsl"]
+
+    // Empty list
+    items: []
+
+    // Map values
+    user: {id: 1, name: "Alice"}
+
+    // Empty map
+    data: {}
+
+    // Nested structures
+    metadata: {
+      author: {
+        id: 1,
+        name: "Alice"
+      },
+      tags: ["go", "testing"]
+    }
+  }
+}
+```
+
+## Assertions
+
+### Expression Assertions
+
+Validate output values using expressions:
+
+```scaf
+Q {
+  test "expression assertions" {
+    // Simple comparison
+    assert { x > 0 }
+
+    // Multiple semicolon-separated expressions
+    assert {
+      x > 0;
+      y < 10;
+      z == 5
+    }
+
+    // Logical expressions
+    assert { x > 0 && y < 10 }
+
+    // Function calls
+    assert { len(items) > 0 }
+
+    // Member access
+    assert { u.age >= 18 }
+
+    // Index access
+    assert { items[0] == "first" }
+
+    // Unary expressions
+    assert { !done }
+
+    // String comparison
+    assert { name == "Alice" }
+  }
+}
+```
+
+### Query Assertions
+
+Run additional queries and validate their results:
+
+```scaf
+Q {
+  test "query assertions" {
+    $id: 1
+
+    // Inline query assertion
+    assert `MATCH (n) RETURN count(n) as c` { c > 0 }
+
+    // Named query assertion (no params)
+    assert CountNodes() { total > 0 }
+
+    // Named query assertion with params
+    assert CreatePost($title: "test", $authorId: 1) {
+      p.title == "test";
+      p.authorId == 1
+    }
+  }
+}
+```
+
+### Multiple Assertions
+
+Tests can have multiple assertion blocks:
+
+```scaf
+Q {
+  test "multiple assertions" {
+    $id: 1
+    assert { x > 0 }
+    assert `CHECK` { y == 1 }
+  }
+}
+```
+
+## Complete Example
+
+Here's a comprehensive example showing all features together:
+
+```scaf
+// Imports
+import fixtures "../shared/fixtures"
+import utils "./utils"
+
+// Query definitions
+query GetUser `
+MATCH (u:User {id: $userId})
+RETURN u.name, u.email, u.age, u.verified
+`
+
+query CountUsers `
+MATCH (u:User)
+RETURN count(u) as cnt
+`
+
+// Global setup
+setup fixtures.CreateUsers()
+
+// Global teardown
+teardown `MATCH (n) DETACH DELETE n`
+
+// Tests for GetUser query
+GetUser {
+  setup `CREATE (:Session {userId: 1})`
+
+  group "existing users" {
+    test "finds Alice with all fields" {
+      $userId: 1
+
+      u.name: "Alice"
+      u.email: "alice@example.com"
+      u.age: 30
+      u.verified: true
+
+      assert { u.age >= 18 }
+    }
+
+    test "finds Bob" {
+      $userId: 2
+
+      u.name: "Bob"
+      u.age: 25
+    }
+  }
+
+  group "edge cases" {
+    test "missing user returns null" {
+      $userId: 999
+
+      u.name: null
+      u.email: null
+    }
+  }
+}
+
+// Tests for CountUsers query
+CountUsers {
+  test "base count" {
+    cnt: 2
+  }
+
+  test "with temp user" {
+    setup `CREATE (:User {id: 999})`
+
+    cnt: 3
+
+    assert CountUsers() { cnt > 2 }
+  }
+}
+```
+
+## Comments
+
+Single-line comments start with `//`:
+
+```scaf
+// This is a comment
+query GetUser `...` // Inline comment
+
+GetUser {
+  // Comment inside scope
+  test "example" {
+    // Comment inside test
+    $id: 1
+  }
+}
+```
