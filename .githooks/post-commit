@@ -1,38 +1,28 @@
 #!/usr/bin/env bash
-# Validate scaf code blocks in docs (best-effort, warns on failures)
+# Validate scaf code blocks in docs that are marked for checking
+# Uses: scaf check --markdown to validate ```scaf check blocks
 # Install: git config core.hooksPath .githooks
 
+set -e
+
 DOCS_DIR="src/content/docs"
-TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
 
-warnings=0
-checked=0
+# Check if scaf is installed
+if ! command -v scaf &> /dev/null; then
+    echo "post-commit: scaf not found, skipping syntax check"
+    echo "  Install with: go install github.com/rlch/scaf/cmd/scaf@latest"
+    exit 0
+fi
 
-# Extract each scaf block individually and try to validate
-for mdx in $(find "$DOCS_DIR" -name "*.mdx" 2>/dev/null); do
-  # Use awk to extract each block separately
-  block_num=0
-  awk '/^```scaf$/,/^```$/' "$mdx" 2>/dev/null | while IFS= read -r line; do
-    if [[ "$line" == '```scaf' ]]; then
-      block_num=$((block_num + 1))
-      : > "$TEMP_DIR/block_${block_num}.scaf"
-    elif [[ "$line" == '```' ]]; then
-      # Block complete, try to validate (silently, partial examples expected to fail)
-      if [ -s "$TEMP_DIR/block_${block_num}.scaf" ]; then
-        checked=$((checked + 1))
-      fi
-    else
-      echo "$line" >> "$TEMP_DIR/block_${block_num}.scaf" 2>/dev/null || true
-    fi
-  done
-done
-
-# Note: Most doc examples are partial/incomplete by design
-# Full validation requires scaf to support --check on snippets
-# For now, this hook just ensures the chain works
-
-echo "post-commit: docs hook ran (full scaf validation TODO)"
+# Run scaf check on markdown files
+# Only blocks marked with ```scaf check or ```scaf! are validated
+if scaf check --markdown "$DOCS_DIR" 2>&1; then
+    echo "post-commit: scaf syntax check passed"
+else
+    echo "post-commit: scaf syntax check failed"
+    echo "  Fix the errors above, or remove 'check' marker from invalid examples"
+    exit 1
+fi
 
 # Chain to local hooks if they exist
 LOCAL_HOOK=".git/hooks/post-commit"

@@ -41,9 +41,9 @@ import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
 ## Quick Example
 
-```scaf
+```scaf check
 // Define your query
-fn GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
