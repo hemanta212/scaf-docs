@@ -68,7 +68,7 @@ generate:
 Given this scaf query:
 
 ```scaf
-query GetUser `
+fn GetUser `
 MATCH (u:User {id: $userId})
 RETURN u.name AS name, u.email AS email
 `

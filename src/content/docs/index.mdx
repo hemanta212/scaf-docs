@@ -43,7 +43,7 @@ import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
 ```scaf
 // Define your query
-query GetUser `
+fn GetUser `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
@@ -72,7 +72,7 @@ GetUser {
       u.age: 25
 
       // Assertion expressions
-      assert { u.age >= 18 }
+      assert (u.age >= 18)
     }
   }
 

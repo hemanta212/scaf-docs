@@ -72,7 +72,7 @@ The grammar defines these node types:
 |------|-------------|
 | `source_file` | Root node |
 | `import_statement` | Import declaration |
-| `query_definition` | Named query |
+| `fn_definition` | Named fn |
 | `setup_block` | Setup block |
 | `teardown_block` | Teardown block |
 | `query_scope` | Query scope with tests |
@@ -135,7 +135,7 @@ The grammar includes query files for:
 
 ```scheme
 ; Keywords
-(["query" "test" "group" "setup" "teardown" "assert" "import"] @keyword)
+(["fn" "test" "group" "setup" "teardown" "assert" "import"] @keyword)
 
 ; Function names
 (query_definition name: (identifier) @function)
@@ -223,7 +223,7 @@ const parser = new Parser();
 parser.setLanguage(Scaf);
 
 const sourceCode = `
-query GetUser \`
+fn GetUser \`
 MATCH (u:User {id: $userId})
 RETURN u.name
 \`

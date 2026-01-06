@@ -81,9 +81,9 @@ GetUser {
 - Blank line between inputs and outputs in a test
 
 ```scaf
-query GetUser `...`
+fn GetUser `...`
 
-query CreateUser `...`
+fn CreateUser `...`
 
 setup `...`
 
@@ -113,7 +113,7 @@ GetUser {
 Query bodies are formatted as-is (preserving your SQL/Cypher formatting):
 
 ```scaf
-query GetUser `
+fn GetUser `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
@@ -125,7 +125,7 @@ Comments are preserved and aligned:
 
 ```scaf
 // This is a top-level comment
-query GetUser `...`
+fn GetUser `...`
 
 GetUser {
   // Group comment

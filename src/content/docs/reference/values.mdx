@@ -44,7 +44,7 @@ backslash: "C:\\path\\to\\file"
 Backtick-delimited, no escape processing:
 
 ```scaf
-query Example `
+fn Example `
   SELECT * FROM users
   WHERE name = 'Alice'
 `
@@ -150,9 +150,9 @@ items: [
 
 ```scaf
 assert {
-  len(items) > 0;
-  items[0] == "first";
-  "admin" in roles
+  (len(items) > 0)
+  (items[0] == "first")
+  ("admin" in roles)
 }
 ```
 
@@ -202,9 +202,9 @@ data: {"user-name": "Alice"}  // Error!
 
 ```scaf
 assert {
-  user.name == "Alice";
-  user.profile.theme == "dark";
-  config["timeout"] > 0
+  (user.name == "Alice")
+  (user.profile.theme == "dark")
+  (config["timeout"] > 0)
 }
 ```
 

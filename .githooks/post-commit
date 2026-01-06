@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Validate all scaf code blocks in docs parse correctly
+# Install: git config core.hooksPath .githooks
+
+set -e
+
+DOCS_DIR="src/content/docs"
+TEMP_DIR=$(mktemp -d)
+trap "rm -rf $TEMP_DIR" EXIT
+
+errors=0
+
+# Extract and validate each scaf block
+for mdx in $(find "$DOCS_DIR" -name "*.mdx" 2>/dev/null); do
+  # Extract scaf blocks with line numbers
+  awk '/^```scaf$/,/^```$/' "$mdx" | grep -v '^```' > "$TEMP_DIR/block.scaf" 2>/dev/null || true
+  
+  if [ -s "$TEMP_DIR/block.scaf" ]; then
+    # Try to parse with scaf fmt (dry-run)
+    if ! scaf fmt "$TEMP_DIR/block.scaf" > /dev/null 2>&1; then
+      echo "FAIL: $mdx contains invalid scaf syntax"
+      errors=$((errors + 1))
+    fi
+  fi
+done
+
+if [ $errors -gt 0 ]; then
+  echo "Found $errors file(s) with invalid scaf blocks"
+  exit 1
+fi
+
+echo "All scaf blocks valid"
