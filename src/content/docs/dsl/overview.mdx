@@ -17,8 +17,8 @@ A scaf file consists of these sections, in order:
 // 1. Imports (optional)
 import fixtures "./shared/fixtures"
 
-// 2. Query definitions
-query GetUser `
+// 2. Function definitions
+fn GetUser(userId: string) `
 MATCH (u:User {id: $userId})
 RETURN u.name
 `
@@ -29,7 +29,7 @@ setup `CREATE (:User {id: 1, name: "Alice"})`
 // 4. Global teardown (optional)
 teardown `MATCH (n) DETACH DELETE n`
 
-// 5. Query scopes with tests
+// 5. Function scopes with tests
 GetUser {
   test "finds user" {
     $userId: 1
@@ -46,7 +46,7 @@ Single-line comments start with `//`:
 
 ```scaf
 // This is a comment
-query GetUser `...` // Inline comment
+fn GetUser(userId) `...` // Inline comment
 ```
 
 ### Identifiers
@@ -57,9 +57,9 @@ Identifiers follow standard rules:
 - Case-sensitive
 
 ```scaf
-query GetUserById `...`  // Valid
-query get_user_2 `...`   // Valid
-query 2users `...`       // Invalid - starts with digit
+fn GetUserById(id) `...`  // Valid
+fn get_user_2(id) `...`   // Valid
+fn 2users(id) `...`       // Invalid - starts with digit
 ```
 
 ### Strings
@@ -76,7 +76,7 @@ u.status: 'active'  // Single quotes also work
 
 **Raw strings** — For query bodies (backtick-delimited):
 ```scaf
-query GetUser `
+fn GetUser(userId) `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email
 `
@@ -120,12 +120,12 @@ metadata: {key: "value", count: 42}
 nested: {outer: {inner: "value"}}
 ```
 
-## Queries
+## Functions
 
 Define named database queries:
 
 ```scaf
-query QueryName `
+fn FunctionName(params) `
   -- Your database query here
   -- Parameters use $paramName syntax
 `
@@ -134,7 +134,7 @@ query QueryName `
 Example with Cypher:
 
 ```scaf
-query GetUserWithPosts `
+fn GetUserWithPosts(userId: string) `
 MATCH (u:User {id: $userId})
 OPTIONAL MATCH (u)-[:AUTHORED]->(p:Post)
 RETURN u.name, collect(p.title) as posts
@@ -147,7 +147,7 @@ RETURN u.name, collect(p.title) as posts
 
 ## Test Scopes
 
-Group tests by the query they exercise:
+Group tests by the function they exercise:
 
 ```scaf
 GetUserWithPosts {
@@ -161,7 +161,7 @@ GetUserWithPosts {
 }
 ```
 
-The scope name must exactly match a defined query name.
+The scope name must exactly match a defined function name.
 
 ## Groups
 
@@ -213,13 +213,13 @@ test "descriptive test name" {
   
   // Optional: expression assertions
   assert {
-    u.age >= 18;
-    u.email contains "@"
+    (u.age >= 18)
+    (u.email contains "@")
   }
   
   // Optional: query assertions
   assert `MATCH (p:Post) RETURN count(p) as cnt` {
-    cnt > 0
+    (cnt > 0)
   }
 }
 ```
@@ -251,7 +251,7 @@ import fixtures "./shared/fixtures"
 setup fixtures.CreateUsers()
 
 // With parameters
-setup fixtures.CreatePosts($count: 10, $authorId: 1)
+setup fixtures.CreatePosts(count: 10, authorId: 1)
 ```
 
 ### Setup Levels
@@ -262,8 +262,8 @@ Setup can be defined at multiple levels:
 // Suite level - runs once for entire file
 setup `...`
 
-QueryName {
-  // Scope level - runs for this query scope
+FunctionName {
+  // Scope level - runs for this function scope
   setup `...`
   
   group "scenario" {
@@ -288,10 +288,10 @@ Validate output values using expressions:
 
 ```scaf
 assert {
-  u.age >= 18;
-  u.email contains "@";
-  len(u.name) > 0;
-  u.status == "active" || u.status == "pending"
+  (u.age >= 18)
+  (u.email contains "@")
+  (len(u.name) > 0)
+  (u.status == "active" || u.status == "pending")
 }
 ```
 
@@ -302,18 +302,18 @@ Run additional queries and validate their results:
 ```scaf
 // Inline query
 assert `MATCH (p:Post) WHERE p.authorId = 1 RETURN count(p) as cnt` {
-  cnt > 0
+  (cnt > 0)
 }
 
-// Named query
+// Named function
 assert CountUsers() {
-  count == 2
+  (count == 2)
 }
 
-// Named query with parameters
-assert GetPostsByAuthor($authorId: 1) {
-  len(posts) > 0;
-  posts[0].title != ""
+// Named function with parameters
+assert GetPostsByAuthor(authorId: 1) {
+  (len(posts) > 0)
+  (posts[0].title != "")
 }
 ```
 
@@ -340,13 +340,13 @@ See [Imports](/dsl/imports/) for full details.
 // Imports
 import fixtures "./shared/fixtures"
 
-// Queries
-query GetUser `
+// Functions
+fn GetUser(userId: string) `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age, u.verified
 `
 
-query CountUsers `
+fn CountUsers() `
 MATCH (u:User)
 RETURN count(u) as cnt
 `
@@ -370,7 +370,7 @@ GetUser {
       u.age: 30
       u.verified: true
       
-      assert { u.age >= 18 }
+      assert { (u.age >= 18) }
     }
     
     test "finds Bob" {
@@ -401,7 +401,7 @@ CountUsers {
     
     cnt: 3
     
-    assert CountUsers() { cnt > 2 }
+    assert CountUsers() { (cnt > 2) }
   }
 }
 ```
