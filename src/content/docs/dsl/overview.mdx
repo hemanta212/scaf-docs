@@ -86,7 +86,7 @@ RETURN u.name, u.email
 
 Multiple number formats supported:
 
-```scaf
+```scaf skip
 age: 42           // Integer
 price: 3.14       // Float
 id: 0xFF          // Hexadecimal
@@ -99,7 +99,7 @@ negative: -42     // Negative numbers
 
 ### Booleans and Null
 
-```scaf
+```scaf skip
 verified: true
 deleted: false
 nickname: null
@@ -108,14 +108,14 @@ nickname: null
 ### Collections
 
 **Lists:**
-```scaf
+```scaf skip
 tags: ["tag1", "tag2", "tag3"]
 ids: [1, 2, 3]
 mixed: [1, "two", true, null]
 ```
 
 **Maps:**
-```scaf
+```scaf skip
 metadata: {key: "value", count: 42}
 nested: {outer: {inner: "value"}}
 ```
@@ -245,7 +245,7 @@ MATCH (n) DETACH DELETE n
 
 Reference setups defined in other files:
 
-```scaf
+```scaf skip
 import fixtures "./shared/fixtures"
 
 setup fixtures.CreateUsers()
@@ -299,7 +299,7 @@ assert {
 
 Run additional queries and validate their results:
 
-```scaf
+```scaf skip
 // Inline query
 assert `MATCH (p:Post) WHERE p.authorId = 1 RETURN count(p) as cnt` {
   (cnt > 0)

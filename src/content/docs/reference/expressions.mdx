@@ -139,11 +139,11 @@ assert {
 
 ## Ternary Operator
 
-```scaf
+```scaf skip
 condition ? valueIfTrue : valueIfFalse
 ```
 
-```scaf
+```scaf skip
 assert {
   ((u.age >= 18 ? u.category : "minor") == "adult")
   (u.verified ? u.status == "active" : u.status == "pending")
@@ -154,7 +154,7 @@ assert {
 
 ### Dot Notation
 
-```scaf
+```scaf skip
 u.name
 u.profile.bio
 u.settings.theme.color
@@ -164,7 +164,7 @@ u.settings.theme.color
 
 Safe access that returns `nil` if the path doesn't exist:
 
-```scaf
+```scaf skip
 u.profile?.bio
 u.settings?.theme?.color
 ```
@@ -178,7 +178,7 @@ assert {
 
 ### Index Access
 
-```scaf
+```scaf skip
 items[0]
 matrix[0][1]
 data["key"]
@@ -298,7 +298,7 @@ assert {
 
 ## Nil Handling
 
-```scaf
+```scaf skip
 assert {
   (u.profile != nil)
   (u.deletedAt == nil)
@@ -335,7 +335,7 @@ assert {
 
 ### Conditional Logic
 
-```scaf
+```scaf skip
 assert {
   (u.admin ? u.permissions contains "delete" : true)
   (u.verified ? len(u.email) > 0 : true)

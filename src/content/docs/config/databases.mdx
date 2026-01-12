@@ -58,7 +58,7 @@ fn GetUser
 
 fn GetUserWithFriends
 
-fn CreateUser `
+fn CreateUser() `
 CREATE (u:User {id: $id, name: $name, email: $email})
 RETURN u
 `
@@ -105,13 +105,13 @@ postgres:
 ### Example SQL Queries
 
 ```scaf
-fn GetUser `
+fn GetUser() `
 SELECT name, email, age
 FROM users
 WHERE id = $userId
 `
 
-fn GetUserWithPosts `
+fn GetUserWithPosts() `
 SELECT 
   u.name,
   u.email,
@@ -122,7 +122,7 @@ WHERE u.id = $userId
 GROUP BY u.id, u.name, u.email
 `
 
-fn CreateUser `
+fn CreateUser() `
 INSERT INTO users (id, name, email)
 VALUES ($id, $name, $email)
 RETURNING id, name, email
@@ -171,7 +171,7 @@ Used by: **Neo4j**
 Graph query language for pattern matching:
 
 ```scaf
-fn Example `
+fn Example() `
 MATCH (n:Node {prop: $value})-[r:RELATES_TO]->(m)
 RETURN n.name, type(r), m.name
 `
@@ -184,7 +184,7 @@ Used by: **PostgreSQL**, **MySQL**, **SQLite**
 Standard SQL with database-specific extensions:
 
 ```scaf
-fn Example `
+fn Example() `
 SELECT name FROM nodes WHERE prop = $value
 `
 ```
@@ -194,7 +194,7 @@ SELECT name FROM nodes WHERE prop = $value
 All databases use `$paramName` for parameters:
 
 ```scaf
-fn Example `
+fn Example() `
 -- Works in both Cypher and SQL
 WHERE id = $userId AND status = $status
 `
@@ -220,7 +220,7 @@ Databases map results to scaf's value types:
 Neo4j nodes and relationships are flattened in results:
 
 ```scaf
-fn GetUser `
+fn GetUser() `
 MATCH (u:User {id: $id})
 RETURN u
 `
@@ -234,7 +234,7 @@ RETURN u
 <TabItem label="Neo4j (Cypher)">
 
 ```scaf
-fn GetUserWithRelations `
+fn GetUserWithRelations() `
 MATCH (u:User {id: $userId})
 OPTIONAL MATCH (u)-[:FRIENDS_WITH]->(f:User)
 OPTIONAL MATCH (u)-[:AUTHORED]->(p:Post)
@@ -249,7 +249,7 @@ RETURN
 <TabItem label="PostgreSQL (SQL)">
 
 ```scaf
-fn GetUserWithRelations `
+fn GetUserWithRelations() `
 SELECT 
   u.name,
   array_agg(DISTINCT f.name) as friends,

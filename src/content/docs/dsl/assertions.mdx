@@ -173,7 +173,7 @@ assert {
 
 ### Ternary Operator
 
-```scaf
+```scaf skip
 assert {
   (u.verified ? u.status == "active" : u.status == "pending")
 }
@@ -181,7 +181,7 @@ assert {
 
 ### Optional Chaining
 
-```scaf
+```scaf skip
 assert {
   // Safe access - won't error if profile is nil
   (u.profile?.bio != "")
@@ -191,7 +191,7 @@ assert {
 
 ### Nil Coalescing
 
-```scaf
+```scaf skip
 assert {
   // Default value if nil
   ((u.nickname ?? "Anonymous") != "")

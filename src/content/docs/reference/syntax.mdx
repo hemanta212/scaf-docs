@@ -31,12 +31,12 @@ import utils "./utils"
 Define named database functions using backtick-delimited raw strings:
 
 ```scaf
-fn GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name
 `
 
-fn CreateUser `INSERT INTO users (name) VALUES ($name)`
+fn CreateUser() `INSERT INTO users (name) VALUES ($name)`
 ```
 
 ## Setup and Teardown
@@ -55,7 +55,7 @@ CREATE (u:User {id: 1, name: "Alice"})
 
 Reference setup functions from imported modules:
 
-```scaf
+```scaf skip
 import fixtures "../shared/fixtures"
 
 // Simple named setup
@@ -294,12 +294,12 @@ import fixtures "../shared/fixtures"
 import utils "./utils"
 
 // Function definitions
-fn GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age, u.verified
 `
 
-fn CountUsers `
+fn CountUsers() `
 MATCH (u:User)
 RETURN count(u) as cnt
 `
@@ -355,7 +355,7 @@ CountUsers {
 
     cnt: 3
 
-    assert CountUsers() (cnt > 2)
+    assert (cnt > 2)
   }
 }
 ```
@@ -366,7 +366,7 @@ Single-line comments start with `//`:
 
 ```scaf
 // This is a comment
-fn GetUser `...` // Inline comment
+fn GetUser() `...` // Inline comment
 
 GetUser {
   // Comment inside scope

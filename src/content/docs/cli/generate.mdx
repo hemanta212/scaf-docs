@@ -109,17 +109,17 @@ generate:
 Given this scaf file:
 
 ```scaf title="users.scaf"
-fn GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name AS name, u.email AS email, u.age AS age
 `
 
-fn CreateUser `
+fn CreateUser() `
 CREATE (u:User {id: $id, name: $name, email: $email})
 RETURN u.id AS id
 `
 
-fn CountUsers `
+fn CountUsers() `
 MATCH (u:User)
 RETURN count(u) AS count
 `

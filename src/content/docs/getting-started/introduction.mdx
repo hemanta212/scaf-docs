@@ -91,12 +91,12 @@ This means multiple databases can share a dialect (PostgreSQL, MySQL, and SQLite
 Define named database queries that your tests will exercise:
 
 ```scaf
-fn GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
 
-fn CreatePost `
+fn CreatePost() `
 CREATE (p:Post {title: $title, authorId: $authorId})
 RETURN p
 `
@@ -236,8 +236,8 @@ A typical scaf file has this structure:
 import fixtures "./shared/fixtures"
 
 // 2. Query definitions
-fn GetUser `...`
-fn CreatePost `...`
+fn GetUser() `...`
+fn CreatePost() `...`
 
 // 3. Global setup & teardown
 setup `...`

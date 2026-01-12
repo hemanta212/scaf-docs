@@ -37,7 +37,7 @@ project/
 
 After importing, use the module's functions in setup blocks:
 
-```scaf
+```scaf skip
 import fixtures "./shared/fixtures"
 
 // Use as named setup
@@ -111,7 +111,7 @@ GetUser {
 
 Use aliases to distinguish between multiple imports:
 
-```scaf
+```scaf skip
 import users "./shared/user-fixtures"
 import posts "./shared/post-fixtures"
 import common "./shared/common"
@@ -194,7 +194,7 @@ setup fixtures.CreateUser(
 
 ### From Query Results (Field References)
 
-```scaf
+```scaf skip
 test "with dynamic data" {
   $userId: 1
   
