@@ -10,10 +10,11 @@
  */
 
 import { visit } from "unist-util-visit";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import type { Plugin } from "unified";
 import type { Root, Code } from "mdast";
 import type { VFile } from "vfile";
 
@@ -40,7 +41,8 @@ function looksLikeScope(code: string): boolean {
  * Check if code looks like an assert block fragment
  */
 function looksLikeAssert(code: string): boolean {
-  return /^\s*assert\s*[({]/.test(code);
+  // Use multiline flag to match assert anywhere in the code
+  return /^\s*assert\s*[({]/m.test(code);
 }
 
 /**
@@ -69,6 +71,8 @@ function wrapAsTest(code: string): WrapResult {
   };
 }
 
+const SCAF_NOT_FOUND = "scaf CLI not found in PATH";
+
 /**
  * Try to parse scaf code using scaf fmt
  */
@@ -80,12 +84,18 @@ function tryParse(code: string): ValidationResult {
   writeFileSync(tempPath, code);
 
   try {
-    execSync(`scaf fmt "${tempPath}"`, {
+    // Use execFileSync to avoid shell quoting issues
+    execFileSync("scaf", ["fmt", tempPath], {
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
     });
     return { success: true };
   } catch (err: unknown) {
+    // Check if scaf CLI is not found
+    if (err instanceof Error && "code" in err && err.code === "ENOENT") {
+      return { success: false, error: SCAF_NOT_FOUND };
+    }
+
     const error = err as { stderr?: string; message?: string };
     const stderr = error.stderr ?? error.message ?? "unknown error";
 
@@ -113,6 +123,18 @@ function tryParse(code: string): ValidationResult {
 }
 
 /**
+ * Adjust error line for wrapper offset, returning a new result (no mutation)
+ */
+function adjustErrorLine(
+  result: ValidationResult,
+  offset: number,
+): ValidationResult {
+  if (result.errorLine === undefined) return result;
+  const adjustedLine = Math.max(1, result.errorLine - offset);
+  return { ...result, errorLine: adjustedLine };
+}
+
+/**
  * Validate code with auto-detection heuristics
  */
 function validateWithAutoDetect(code: string): ValidationResult {
@@ -120,17 +142,15 @@ function validateWithAutoDetect(code: string): ValidationResult {
   const direct = tryParse(code);
   if (direct.success) return direct;
 
+  // Short-circuit if scaf CLI not found - no point trying wrapped versions
+  if (direct.error === SCAF_NOT_FOUND) return direct;
+
   // Strategy 2: If looks like a scope (test/group blocks), wrap and retry
   if (looksLikeScope(code)) {
     const wrapped = wrapAsScope(code);
     const result = tryParse(wrapped.code);
     if (result.success) return { success: true };
-    // Adjust error line for wrapper offset
-    if (result.errorLine !== undefined) {
-      result.errorLine -= wrapped.offset;
-      if (result.errorLine < 1) result.errorLine = 1;
-    }
-    return result;
+    return adjustErrorLine(result, wrapped.offset);
   }
 
   // Strategy 3: If looks like an assert fragment, wrap in test and retry
@@ -138,11 +158,7 @@ function validateWithAutoDetect(code: string): ValidationResult {
     const wrapped = wrapAsTest(code);
     const result = tryParse(wrapped.code);
     if (result.success) return { success: true };
-    if (result.errorLine !== undefined) {
-      result.errorLine -= wrapped.offset;
-      if (result.errorLine < 1) result.errorLine = 1;
-    }
-    return result;
+    return adjustErrorLine(result, wrapped.offset);
   }
 
   // All strategies failed - return original error
@@ -152,14 +168,14 @@ function validateWithAutoDetect(code: string): ValidationResult {
 /**
  * Remark plugin to validate scaf code blocks
  */
-export function remarkScafValidate() {
+export const remarkScafValidate: Plugin<[], Root> = () => {
   return (tree: Root, file: VFile) => {
     visit(tree, "code", (node: Code) => {
       // Only process scaf blocks
       if (node.lang !== "scaf") return;
 
-      // Escape hatch: skip validation for ```scaf skip
-      if (node.meta === "skip") return;
+      // Escape hatch: skip validation for ```scaf skip (with optional extra meta)
+      if (node.meta?.split(/\s+/).includes("skip")) return;
 
       const code = node.value;
 
@@ -177,6 +193,8 @@ export function remarkScafValidate() {
 
       if (!result.success) {
         // Calculate the actual line in the file
+        // startLine is the line of ```, code starts on startLine + 1
+        // errorLine is 1-based within the snippet, so line 1 of snippet = startLine + 1
         const errorLine = startLine + (result.errorLine ?? 1);
         file.fail(`scaf syntax error: ${result.error}`, {
           line: errorLine,
@@ -185,6 +203,6 @@ export function remarkScafValidate() {
       }
     });
   };
-}
+};
 
 export default remarkScafValidate;
