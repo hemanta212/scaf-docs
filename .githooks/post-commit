@@ -1,31 +1,7 @@
 #!/usr/bin/env bash
-# Validate scaf code blocks in docs that are marked for checking
-# Uses: scaf check --markdown to validate ```scaf check blocks
+# Run CI checks after commit
 # Install: git config core.hooksPath .githooks
 
 set -e
 
-DOCS_DIR="src/content/docs"
-
-# Check if scaf is installed
-if ! command -v scaf &> /dev/null; then
-    echo "post-commit: scaf not found, skipping syntax check"
-    echo "  Install with: go install github.com/rlch/scaf/cmd/scaf@latest"
-    exit 0
-fi
-
-# Run scaf check on markdown files
-# Only blocks marked with ```scaf check or ```scaf! are validated
-if scaf check --markdown "$DOCS_DIR" 2>&1; then
-    echo "post-commit: scaf syntax check passed"
-else
-    echo "post-commit: scaf syntax check failed"
-    echo "  Fix the errors above, or remove 'check' marker from invalid examples"
-    exit 1
-fi
-
-# Chain to local hooks if they exist
-LOCAL_HOOK=".git/hooks/post-commit"
-if [ -x "$LOCAL_HOOK" ]; then
-  "$LOCAL_HOOK"
-fi
+task ci

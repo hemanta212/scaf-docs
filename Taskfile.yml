@@ -1,0 +1,91 @@
+version: "3"
+
+vars:
+  TMP_LOG: /tmp/docs-build.log
+
+tasks:
+  default:
+    desc: Run all CI checks
+    cmds:
+      - task: ci
+
+  ci:
+    desc: Run full CI pipeline (build + validate)
+    cmds:
+      - task: build-and-validate
+
+  build-and-validate:
+    desc: Build and validate scaf code blocks (context-efficient)
+    cmds:
+      - |
+        if pnpm run build >"{{.TMP_LOG}}" 2>&1; then
+          if grep -q "scaf syntax error" "{{.TMP_LOG}}"; then
+            echo "  ✗ scaf validation"
+            grep -A5 "scaf syntax error" "{{.TMP_LOG}}"
+            exit 1
+          fi
+          echo "  ✓ build"
+          echo "  ✓ scaf validation (all blocks valid)"
+        else
+          echo "  ✗ build"
+          tail -50 "{{.TMP_LOG}}"
+          exit 1
+        fi
+
+  build:
+    desc: Build the documentation site
+    cmds:
+      - pnpm run build
+
+  dev:
+    desc: Start development server
+    cmds:
+      - pnpm run dev
+
+  validate:
+    desc: Validate scaf code blocks in docs (runs during build)
+    cmds:
+      - task: build-and-validate
+
+  fmt:
+    desc: Format TypeScript/JavaScript with prettier
+    cmds:
+      - |
+        if pnpm exec prettier --write "src/**/*.{ts,js,mjs,astro}" >/dev/null 2>&1; then
+          echo "  ✓ fmt"
+        else
+          echo "  ✗ fmt"
+          pnpm exec prettier --write "src/**/*.{ts,js,mjs,astro}"
+          exit 1
+        fi
+
+  fmt:check:
+    desc: Check code formatting
+    cmds:
+      - |
+        if pnpm exec prettier --check "src/**/*.{ts,js,mjs,astro}" >/dev/null 2>&1; then
+          echo "  ✓ fmt:check"
+        else
+          echo "  ✗ fmt:check"
+          pnpm exec prettier --check "src/**/*.{ts,js,mjs,astro}"
+          exit 1
+        fi
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf dist/
+      - rm -rf .astro/
+      - echo "  ✓ clean"
+
+  deps:
+    desc: Install dependencies
+    cmds:
+      - |
+        if pnpm install >/dev/null 2>&1; then
+          echo "  ✓ deps"
+        else
+          echo "  ✗ deps"
+          pnpm install
+          exit 1
+        fi
