@@ -7,7 +7,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 # Imports
 
-Imports allow you to reuse setup queries, fixtures, and test utilities across multiple scaf files.
+Imports allow you to reuse setup functions, fixtures, and test utilities across multiple scaf files.
 
 ## Basic Syntax
 
@@ -35,31 +35,31 @@ project/
 
 ## Using Imported Setups
 
-After importing, use the module's queries in setup blocks:
+After importing, use the module's functions in setup blocks:
 
-```scaf
+```scaf skip
 import fixtures "./shared/fixtures"
 
 // Use as named setup
 setup fixtures.CreateUsers()
 
-// With parameters
-setup fixtures.CreatePosts($count: 10, $authorId: 1)
+// With parameters (no $ prefix)
+setup fixtures.CreatePosts(count: 10, authorId: 1)
 ```
 
 ## Defining Reusable Setups
 
-In your shared file, define queries that can be called as setups:
+In your shared file, define functions that can be called as setups:
 
 ```scaf title="shared/fixtures.scaf"
 // Simple setup - no parameters
-query CreateUsers `
+fn CreateUsers() `
 CREATE (alice:User {id: 1, name: "Alice", email: "alice@example.com", age: 30})
 CREATE (bob:User {id: 2, name: "Bob", email: "bob@example.com", age: 25})
 `
 
 // Parameterized setup
-query CreatePosts `
+fn CreatePosts(count: int, authorId: int) `
 UNWIND range(1, $count) as i
 CREATE (:Post {
   id: i,
@@ -70,7 +70,7 @@ CREATE (:Post {
 `
 
 // Setup with relationships
-query CreateFriendships `
+fn CreateFriendships(userId: int, friendIds: [int]) `
 MATCH (u1:User {id: $userId})
 UNWIND $friendIds as friendId
 MATCH (u2:User {id: friendId})
@@ -81,9 +81,9 @@ CREATE (u1)-[:FRIENDS_WITH]->(u2)
 ## Using Fixtures
 
 ```scaf title="queries/users.scaf"
-import fixtures "./shared/fixtures"
+import fixtures "../shared/fixtures"
 
-query GetUser `
+fn GetUser(userId: string) `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
@@ -92,12 +92,12 @@ RETURN u.name, u.email, u.age
 setup fixtures.CreateUsers()
 
 GetUser {
-  // Scope setup with parameters
-  setup fixtures.CreatePosts($count: 5, $authorId: 1)
+  // Scope setup with parameters (no $ prefix)
+  setup fixtures.CreatePosts(count: 5, authorId: 1)
   
   group "with friends" {
     // Group setup with parameters
-    setup fixtures.CreateFriendships($userId: 1, $friendIds: [2])
+    setup fixtures.CreateFriendships(userId: 1, friendIds: [2])
     
     test "user has friends and posts" {
       $userId: 1
@@ -111,14 +111,14 @@ GetUser {
 
 Use aliases to distinguish between multiple imports:
 
-```scaf
+```scaf skip
 import users "./shared/user-fixtures"
 import posts "./shared/post-fixtures"
 import common "./shared/common"
 
 setup common.ClearDatabase()
 setup users.CreateTestUsers()
-setup posts.CreateTestPosts($count: 10)
+setup posts.CreateTestPosts(count: 10)
 ```
 
 ## Import Resolution
@@ -127,7 +127,7 @@ scaf resolves imports at parse time:
 
 1. Path is resolved relative to the importing file
 2. The imported file is parsed
-3. Query definitions become available via the alias
+3. Function definitions become available via the alias
 
 <Aside type="caution">
   Circular imports are not allowed. If `a.scaf` imports `b.scaf`, then `b.scaf` cannot import `a.scaf`.
@@ -151,7 +151,7 @@ shared/
 shared/
 ├── fixtures.scaf    # Test data creation
 ├── cleanup.scaf     # Teardown utilities
-└── assertions.scaf  # Common assertion queries
+└── assertions.scaf  # Common assertion functions
 ```
 
 ### Hierarchical
@@ -171,15 +171,15 @@ shared/
 ### Simple Values
 
 ```scaf
-setup fixtures.CreateUser($id: 1, $name: "Alice")
+setup fixtures.CreateUser(id: 1, name: "Alice")
 ```
 
 ### Collections
 
 ```scaf
 setup fixtures.CreateFriendships(
-  $userId: 1,
-  $friendIds: [2, 3, 4, 5]
+  userId: 1,
+  friendIds: [2, 3, 4, 5]
 )
 ```
 
@@ -187,22 +187,22 @@ setup fixtures.CreateFriendships(
 
 ```scaf
 setup fixtures.CreateUser(
-  $id: 1,
-  $data: {name: "Alice", email: "alice@example.com", age: 30}
+  id: 1,
+  data: {name: "Alice", email: "alice@example.com", age: 30}
 )
 ```
 
-### From Query Results
+### From Query Results (Field References)
 
-```scaf
+```scaf skip
 test "with dynamic data" {
   $userId: 1
   
   u.id: 1
   
   // Use result value as parameter
-  assert fixtures.CountPosts($authorId: u.id) {
-    count >= 0
+  assert fixtures.CountPosts(authorId: u.id) {
+    (count >= 0)
   }
 }
 ```
@@ -215,17 +215,19 @@ test "with dynamic data" {
 
 3. **Parameterize when possible** — Make fixtures flexible
 
-4. **Document complex fixtures** — Add comments explaining the data structure
+4. **Add type annotations** — Improves documentation and validation
 
-5. **Keep fixtures focused** — One responsibility per setup query
+5. **Document complex fixtures** — Add comments explaining the data structure
+
+6. **Keep fixtures focused** — One responsibility per setup function
 
 ```scaf title="shared/fixtures.scaf"
 // Creates a standard test user with optional profile
 // Parameters:
-//   $id: User ID (required)
-//   $name: Display name (required)
-//   $withProfile: Create profile if true (optional, default false)
-query CreateUserWithProfile `
+//   id: User ID (required)
+//   name: Display name (required)
+//   withProfile: Create profile if true (optional, default false)
+fn CreateUserWithProfile(id: string, name: string, withProfile: bool?) `
 CREATE (u:User {id: $id, name: $name})
 WITH u
 FOREACH (x IN CASE WHEN $withProfile THEN [1] ELSE [] END |
@@ -242,7 +244,7 @@ scaf reports errors for:
 - File not found
 - Circular imports
 - Invalid path syntax
-- Missing query definitions
+- Missing function definitions
 
 ```
 Error: import "./shared/fixtures"

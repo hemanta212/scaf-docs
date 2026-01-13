@@ -76,7 +76,7 @@ GetUser {
 
 ### Scope Level
 
-Runs for each query scope:
+Runs for each function scope:
 
 ```scaf
 GetUser {
@@ -183,12 +183,25 @@ GetUser {
 
 Reference setups defined elsewhere:
 
-### Import and Use
+### Module Setup
+
+Run an imported module's setup clause:
 
 ```scaf
 import fixtures "./shared/fixtures"
 
-// Use imported setup
+// Use module setup (runs the module's setup clause)
+setup fixtures
+```
+
+### Function Call
+
+Call a specific function from an imported module:
+
+```scaf
+import fixtures "./shared/fixtures"
+
+// Call function with parameters (no $ prefix)
 setup fixtures.CreateUsers()
 ```
 
@@ -197,11 +210,11 @@ setup fixtures.CreateUsers()
 ```scaf
 import fixtures "./shared/fixtures"
 
-// Pass parameters to setup
-setup fixtures.CreatePosts($count: 10, $authorId: 1)
+// Pass parameters to setup (no $ prefix on param names)
+setup fixtures.CreatePosts(count: 10, authorId: 1)
 
 GetUser {
-  setup fixtures.AddFriends($userId: 1, $friendIds: [2, 3, 4])
+  setup fixtures.AddFriends(userId: 1, friendIds: [2, 3, 4])
   
   test "user with friends" {
     $userId: 1
@@ -210,22 +223,34 @@ GetUser {
 }
 ```
 
+### Block Setup
+
+Combine multiple setup calls:
+
+```scaf
+setup {
+  fixtures                           // run module's setup clause
+  fixtures.CreateUser(id: 1, name: "Test")
+  `CREATE (:Extra)`                  // inline query
+}
+```
+
 ### Defining Named Setups
 
 In `shared/fixtures.scaf`:
 
 ```scaf
-query CreateUsers `
+fn CreateUsers() `
 CREATE (alice:User {id: 1, name: "Alice"})
 CREATE (bob:User {id: 2, name: "Bob"})
 `
 
-query CreatePosts `
+fn CreatePosts(count: int, authorId: int) `
 UNWIND range(1, $count) as i
 CREATE (:Post {id: i, authorId: $authorId, title: "Post " + i})
 `
 
-query AddFriends `
+fn AddFriends(userId: int, friendIds: [int]) `
 MATCH (u:User {id: $userId})
 UNWIND $friendIds as friendId
 MATCH (f:User {id: friendId})

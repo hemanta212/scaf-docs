@@ -7,19 +7,19 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 # Tests & Groups
 
-scaf provides a hierarchical structure for organizing tests: **scopes** group tests by query, **groups** organize related scenarios, and **tests** define individual cases.
+scaf provides a hierarchical structure for organizing tests: **scopes** group tests by function, **groups** organize related scenarios, and **tests** define individual cases.
 
 ## Test Scopes
 
-Every test must be inside a scope that matches a defined query:
+Every test must be inside a scope that matches a defined function:
 
 ```scaf
-query GetUser `
+fn GetUser(userId) `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email
 `
 
-// Scope name must match query name
+// Scope name must match function name
 GetUser {
   test "finds user" {
     $userId: 1
@@ -29,7 +29,7 @@ GetUser {
 ```
 
 <Aside type="caution">
-  The scope name must exactly match a query name. If no matching query exists, scaf will report an error.
+  The scope name must exactly match a function name. If no matching function exists, scaf will report an error.
 </Aside>
 
 ### Multiple Scopes
@@ -37,9 +37,9 @@ GetUser {
 You can have multiple scopes in one file:
 
 ```scaf
-query GetUser `...`
-query CreateUser `...`
-query DeleteUser `...`
+fn GetUser(userId) `...`
+fn CreateUser(name, email) `...`
+fn DeleteUser(userId) `...`
 
 GetUser {
   test "finds user" { ... }
@@ -191,8 +191,8 @@ test "user meets requirements" {
   u.name: "Alice"
   
   assert {
-    u.age >= 18;
-    u.verified == true
+    (u.age >= 18)
+    (u.verified == true)
   }
 }
 ```
@@ -304,7 +304,7 @@ group "cases" { ... }
 
 ## Test Path
 
-Each test has a unique path: `QueryScope/Group/Test`:
+Each test has a unique path: `FunctionScope/Group/Test`:
 
 ```scaf
 GetUser {
@@ -376,7 +376,7 @@ GetUser {
   group "validation" {
     test "age must be positive" {
       $userId: 1
-      assert { u.age > 0 }
+      assert { (u.age > 0) }
     }
   }
 }

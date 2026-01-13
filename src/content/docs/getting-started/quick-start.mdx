@@ -25,7 +25,7 @@ This guide walks you through writing your first scaf test file. We'll test a sim
 
    ```scaf
    // Define the query we want to test
-   query GetUser `
+   fn GetUser() `
    MATCH (u:User {id: $userId})
    RETURN u.name, u.email, u.age
    `
@@ -77,12 +77,12 @@ Here's the full file:
 
 ```scaf title="users.scaf"
 // Query definitions
-query GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
 
-query CountUsers `
+fn CountUsers() `
 MATCH (u:User)
 RETURN count(u) as count
 `
@@ -177,8 +177,8 @@ GetUser {
     
     // Expression assertions
     assert {
-      u.age >= 18;
-      u.email contains "@"
+      (u.age >= 18)
+      (u.email contains "@")
     }
   }
   

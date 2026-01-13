@@ -26,17 +26,17 @@ import fixtures "../shared/fixtures"
 import utils "./utils"
 ```
 
-## Query Definitions
+## Function Definitions
 
-Define named database queries using backtick-delimited raw strings:
+Define named database functions using backtick-delimited raw strings:
 
 ```scaf
-query GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name
 `
 
-query CreateUser `INSERT INTO users (name) VALUES ($name)`
+fn CreateUser() `INSERT INTO users (name) VALUES ($name)`
 ```
 
 ## Setup and Teardown
@@ -55,14 +55,14 @@ CREATE (u:User {id: 1, name: "Alice"})
 
 Reference setup functions from imported modules:
 
-```scaf
+```scaf skip
 import fixtures "../shared/fixtures"
 
 // Simple named setup
 setup fixtures.CreateUsers()
 
 // With parameters
-setup fixtures.CreatePosts($count: 10, $authorId: 1)
+setup fixtures.CreatePosts(count: 10, authorId: 1)
 ```
 
 ### Teardown
@@ -218,32 +218,30 @@ Validate output values using expressions:
 Q {
   test "expression assertions" {
     // Simple comparison
-    assert { x > 0 }
+    assert (x > 0)
 
-    // Multiple semicolon-separated expressions
-    assert {
-      x > 0;
-      y < 10;
-      z == 5
-    }
+    // Multiple assertions
+    assert (x > 0)
+    assert (y < 10)
+    assert (z == 5)
 
     // Logical expressions
-    assert { x > 0 && y < 10 }
+    assert (x > 0 && y < 10)
 
     // Function calls
-    assert { len(items) > 0 }
+    assert (len(items) > 0)
 
     // Member access
-    assert { u.age >= 18 }
+    assert (u.age >= 18)
 
     // Index access
-    assert { items[0] == "first" }
+    assert (items[0] == "first")
 
     // Unary expressions
-    assert { !done }
+    assert (!done)
 
     // String comparison
-    assert { name == "Alice" }
+    assert (name == "Alice")
   }
 }
 ```
@@ -258,16 +256,16 @@ Q {
     $id: 1
 
     // Inline query assertion
-    assert `MATCH (n) RETURN count(n) as c` { c > 0 }
+    assert `MATCH (n) RETURN count(n) as c` (c > 0)
 
     // Named query assertion (no params)
-    assert CountNodes() { total > 0 }
+    assert CountNodes() (total > 0)
 
     // Named query assertion with params
-    assert CreatePost($title: "test", $authorId: 1) {
-      p.title == "test";
+    assert CreatePost(title: "test", authorId: 1) (
+      p.title == "test" &&
       p.authorId == 1
-    }
+    )
   }
 }
 ```
@@ -280,8 +278,8 @@ Tests can have multiple assertion blocks:
 Q {
   test "multiple assertions" {
     $id: 1
-    assert { x > 0 }
-    assert `CHECK` { y == 1 }
+    assert (x > 0)
+    assert `CHECK` (y == 1)
   }
 }
 ```
@@ -295,13 +293,13 @@ Here's a comprehensive example showing all features together:
 import fixtures "../shared/fixtures"
 import utils "./utils"
 
-// Query definitions
-query GetUser `
+// Function definitions
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age, u.verified
 `
 
-query CountUsers `
+fn CountUsers() `
 MATCH (u:User)
 RETURN count(u) as cnt
 `
@@ -325,7 +323,7 @@ GetUser {
       u.age: 30
       u.verified: true
 
-      assert { u.age >= 18 }
+      assert (u.age >= 18)
     }
 
     test "finds Bob" {
@@ -357,7 +355,7 @@ CountUsers {
 
     cnt: 3
 
-    assert CountUsers() { cnt > 2 }
+    assert (cnt > 2)
   }
 }
 ```
@@ -368,7 +366,7 @@ Single-line comments start with `//`:
 
 ```scaf
 // This is a comment
-query GetUser `...` // Inline comment
+fn GetUser() `...` // Inline comment
 
 GetUser {
   // Comment inside scope

@@ -13,7 +13,7 @@ scaf supports several value types for inputs, expected outputs, and assertions.
 
 Double or single quotes:
 
-```scaf
+```scaf skip
 name: "Alice"
 status: 'active'
 message: "Hello, World!"
@@ -22,7 +22,7 @@ path: '/usr/local/bin'
 
 ### Escape Sequences
 
-```scaf
+```scaf skip
 // In quoted strings
 escaped: "Line 1\nLine 2"
 tab: "Column1\tColumn2"
@@ -44,7 +44,7 @@ backslash: "C:\\path\\to\\file"
 Backtick-delimited, no escape processing:
 
 ```scaf
-query Example `
+fn Example() `
   SELECT * FROM users
   WHERE name = 'Alice'
 `
@@ -56,7 +56,7 @@ Raw strings preserve all content literally, including newlines and special chara
 
 ### Integers
 
-```scaf
+```scaf skip
 count: 42
 negative: -17
 zero: 0
@@ -64,7 +64,7 @@ zero: 0
 
 ### Floats
 
-```scaf
+```scaf skip
 price: 19.99
 rate: 0.05
 negative: -3.14
@@ -72,7 +72,7 @@ negative: -3.14
 
 ### Alternate Bases
 
-```scaf
+```scaf skip
 // Hexadecimal
 hex: 0xFF
 hex2: 0x1a2b3c
@@ -88,7 +88,7 @@ permissions: 0o644
 
 ### Scientific Notation
 
-```scaf
+```scaf skip
 large: 1e10
 small: 1.5e-5
 precise: 6.022e23
@@ -98,7 +98,7 @@ precise: 6.022e23
 
 Underscores improve readability:
 
-```scaf
+```scaf skip
 million: 1_000_000
 binary: 0b1111_0000_1111_0000
 hex: 0xFF_FF_FF
@@ -106,7 +106,7 @@ hex: 0xFF_FF_FF
 
 ## Booleans
 
-```scaf
+```scaf skip
 verified: true
 deleted: false
 ```
@@ -115,7 +115,7 @@ Case-sensitive — `True`, `TRUE`, `FALSE` are invalid.
 
 ## Null
 
-```scaf
+```scaf skip
 deletedAt: null
 optionalField: null
 ```
@@ -126,7 +126,7 @@ Use `null` to assert that a field is null/missing.
 
 Ordered collections:
 
-```scaf
+```scaf skip
 // Empty list
 empty: []
 
@@ -150,9 +150,9 @@ items: [
 
 ```scaf
 assert {
-  len(items) > 0;
-  items[0] == "first";
-  "admin" in roles
+  (len(items) > 0)
+  (items[0] == "first")
+  ("admin" in roles)
 }
 ```
 
@@ -160,7 +160,7 @@ assert {
 
 Key-value objects:
 
-```scaf
+```scaf skip
 // Empty map
 empty: {}
 
@@ -190,7 +190,7 @@ options: {
 
 Keys must be valid identifiers (no quotes):
 
-```scaf
+```scaf skip
 // Valid
 data: {name: "Alice", userId: 1}
 
@@ -202,9 +202,9 @@ data: {"user-name": "Alice"}  // Error!
 
 ```scaf
 assert {
-  user.name == "Alice";
-  user.profile.theme == "dark";
-  config["timeout"] > 0
+  (user.name == "Alice")
+  (user.profile.theme == "dark")
+  (config["timeout"] > 0)
 }
 ```
 
@@ -225,7 +225,7 @@ scaf compares values with type awareness:
 
 Complex nested data:
 
-```scaf
+```scaf skip
 test "complex data" {
   $input: {
     users: [

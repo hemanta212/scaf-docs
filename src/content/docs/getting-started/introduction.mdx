@@ -91,12 +91,12 @@ This means multiple databases can share a dialect (PostgreSQL, MySQL, and SQLite
 Define named database queries that your tests will exercise:
 
 ```scaf
-query GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
 
-query CreatePost `
+fn CreatePost() `
 CREATE (p:Post {title: $title, authorId: $authorId})
 RETURN p
 `
@@ -134,7 +134,7 @@ test "user is a verified adult" {
   u.name: "Alice"
   u.verified: true
   
-  assert { u.age >= 18 }
+  assert (u.age >= 18)
 }
 ```
 
@@ -215,14 +215,14 @@ test "user data validation" {
   
   // Expression assertions
   assert {
-    u.age >= 18;
-    u.email contains "@";
-    len(u.name) > 0
+    (u.age >= 18)
+    (u.email contains "@")
+    (len(u.name) > 0)
   }
   
   // Query assertions - run another query and check results
   assert `MATCH (p:Post {authorId: 1}) RETURN count(p) as cnt` {
-    cnt > 0
+    (cnt > 0)
   }
 }
 ```
@@ -236,8 +236,8 @@ A typical scaf file has this structure:
 import fixtures "./shared/fixtures"
 
 // 2. Query definitions
-query GetUser `...`
-query CreatePost `...`
+fn GetUser() `...`
+fn CreatePost() `...`
 
 // 3. Global setup & teardown
 setup `...`

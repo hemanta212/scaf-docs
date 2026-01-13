@@ -24,7 +24,7 @@ import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
 ## Why scaf?
 
-<CardGrid stagger>
+<CardGrid>
 	<Card title="Declarative Tests" icon="approve-check">
 		Define inputs, expected outputs, and assertions in a clear, readable format. No boilerplate.
 	</Card>
@@ -41,9 +41,9 @@ import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
 ## Quick Example
 
-```scaf
+```scaf check
 // Define your query
-query GetUser `
+fn GetUser() `
 MATCH (u:User {id: $userId})
 RETURN u.name, u.email, u.age
 `
@@ -72,7 +72,7 @@ GetUser {
       u.age: 25
 
       // Assertion expressions
-      assert { u.age >= 18 }
+      assert (u.age >= 18)
     }
   }
 
